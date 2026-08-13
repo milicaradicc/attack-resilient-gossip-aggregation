@@ -1,40 +1,9 @@
 {
-  "n_honest": [
-    10,
-    15,
-    20
-  ],
-  "beta": [
-    0.0,
-    0.1,
-    0.2,
-    0.3
-  ],
-  "overlay": [
-    "random",
-    "sybil_resistant",
-    "eclipse_resistant"
-  ],
-  "aggregation": [
-    "mean",
-    "median",
-    "trimmed_mean"
-  ],
-  "seeds": [
-    1,
-    2,
-    3,
-    4,
-    5
-  ],
-  "peer_set_size": 7,
-  "num_rounds": 50,
-  "coordinated_value": 1000.0,
-  "pow_difficulty_bits": 12,
-  "num_buckets": 8,
-  "byzantine_fraction": 0.34,
-  "epsilon": 0.05,
-  "conv_window_start": 20,
+  "n_honest": [10, 15, 20],
+  "beta": [0.0, 0.1, 0.2, 0.3],
+  "overlay": ["random", "sybil_resistant", "eclipse_resistant"],
+  "aggregation": ["mean", "median", "trimmed_mean"],
+  "seeds": [1, 2, 3, 4, 5],
   "warmup": 10,
-  "trim_alpha": 0.2
+  "conv_window_start": 20
 }

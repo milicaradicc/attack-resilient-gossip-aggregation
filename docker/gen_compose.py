@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import argparse
 
+from experiments.config import load_defaults
 
-def counts(n_honest, beta, byzantine_fraction=0.34):
+
+def counts(n_honest, beta, byzantine_fraction=None):
+    if byzantine_fraction is None:
+        byzantine_fraction = load_defaults()["byzantine_fraction"]
     n_mal = round(n_honest * beta / (1.0 - beta)) if beta > 0 else 0
     n_byz = round(n_mal * byzantine_fraction)
     return n_byz, n_mal - n_byz
@@ -40,27 +44,28 @@ def generate(args):
 
 
 def main():
+    d = load_defaults()
     p = argparse.ArgumentParser()
-    p.add_argument("--n-honest", type=int, default=15)
-    p.add_argument("--beta", type=float, default=0.3)
-    p.add_argument("--rounds", type=int, default=50)
-    p.add_argument("--warmup", type=int, default=10)
+    p.add_argument("--n-honest", type=int, default=d["n_honest"][0])
+    p.add_argument("--beta", type=float, default=d["beta"][0])
+    p.add_argument("--rounds", type=int, default=d["num_rounds"])
+    p.add_argument("--warmup", type=int, default=d["warmup"])
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--peer-set-size", type=int, default=7)
-    p.add_argument("--strategy", default="eclipse_resistant")
-    p.add_argument("--aggregation", default="trimmed_mean")
-    p.add_argument("--profile", default="coordinated")
-    p.add_argument("--coordinated-value", type=float, default=1000.0)
-    p.add_argument("--pow-bits", type=int, default=12)
-    p.add_argument("--num-buckets", type=int, default=8)
-    p.add_argument("--timeout-rounds", type=int, default=3)
-    p.add_argument("--trim-alpha", type=float, default=0.2)
-    p.add_argument("--flooding", type=int, default=0)
-    p.add_argument("--churn-period", type=int, default=0)
-    p.add_argument("--unresponsive-p", type=float, default=0.0)
-    p.add_argument("--selective-p", type=float, default=1.0)
-    p.add_argument("--port", type=int, default=8000)
-    p.add_argument("--out", default="docker/docker-compose.yml")
+    p.add_argument("--peer-set-size", type=int, default=d["peer_set_size"])
+    p.add_argument("--strategy", default=d["overlay"][0])
+    p.add_argument("--aggregation", default=d["aggregation"][0])
+    p.add_argument("--profile", default=d["byzantine_profile"][0])
+    p.add_argument("--coordinated-value", type=float, default=d["coordinated_value"])
+    p.add_argument("--pow-bits", type=int, default=d["pow_difficulty_bits"])
+    p.add_argument("--num-buckets", type=int, default=d["num_buckets"])
+    p.add_argument("--timeout-rounds", type=int, default=d["timeout_rounds"])
+    p.add_argument("--trim-alpha", type=float, default=d["trim_alpha"])
+    p.add_argument("--flooding", type=int, default=d["flooding"])
+    p.add_argument("--churn-period", type=int, default=d["churn_period"])
+    p.add_argument("--unresponsive-p", type=float, default=d["unresponsive_p"])
+    p.add_argument("--selective-p", type=float, default=d["selective_p"])
+    p.add_argument("--port", type=int, default=d["docker_port"])
+    p.add_argument("--out", default=d["docker_compose_out"])
     a = p.parse_args()
     text, total, n_byz, n_syb = generate(a)
     with open(a.out, "w") as f:

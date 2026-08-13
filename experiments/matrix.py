@@ -35,12 +35,15 @@ SUMMARY_FIELDS = [
 ]
 # 6.3.6 peer diversity
 
+
 def run_single(spec: RunSpec) -> ExperimentMetrics:
     base = RunConfig(
         n_honest=spec.n_honest,
         peer_set_size=spec.peer_set_size,
         num_rounds=spec.num_rounds,
         global_seed=spec.seed,
+        value_low=spec.value_low,
+        value_high=spec.value_high,
     )
     nodes = build_nodes(base)
     seed_observations(nodes)
@@ -53,7 +56,13 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
 
     id_params = IdentityParams(
         pow_difficulty_bits=spec.pow_difficulty_bits,
+        age_min=spec.age_min,
+        age_max=spec.age_max,
+        exchange_max=spec.exchange_max,
+        score_threshold=spec.score_threshold,
         num_buckets=spec.num_buckets,
+        max_per_bucket=spec.max_per_bucket,
+        timeout_rounds=spec.timeout_rounds,
     )
     registry = register_all(honest | byzantine | sybil, id_params)
 
@@ -64,6 +73,12 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
         scenario = Scenario(honest, byzantine, sybil, AttackParams(
             byzantine_profile=spec.byzantine_profile,
             coordinated_value=spec.coordinated_value,
+            extreme_offset=spec.extreme_offset,
+            random_low=spec.random_low,
+            random_high=spec.random_high,
+            low_bias=spec.low_bias,
+            stale_value=spec.stale_value,
+            poison_honest_offers=spec.poison_honest_offers,
             x_star=x_star,
             activate_round=spec.activate_round,
             flooding=spec.flooding,

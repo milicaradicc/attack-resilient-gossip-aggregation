@@ -1,0 +1,44 @@
+{
+  "n_honest": [10],
+  "beta": [0.0],
+  "overlay": ["eclipse_resistant"],
+  "aggregation": ["trimmed_mean"],
+  "seeds": [1],
+  "byzantine_profile": ["coordinated"],
+
+  "peer_set_size": 7,
+  "num_rounds": 50,
+  "warmup": 10,
+  "value_low": 50.0,
+  "value_high": 150.0,
+
+  "pow_difficulty_bits": 12,
+  "age_min": 3,
+  "age_max": 20,
+  "exchange_max": 20,
+  "score_threshold": 0.5,
+  "num_buckets": 8,
+  "max_per_bucket": 2,
+  "timeout_rounds": 3,
+
+  "trim_alpha": 0.2,
+
+  "byzantine_fraction": 0.34,
+  "coordinated_value": 1000.0,
+  "extreme_offset": 1000.0,
+  "random_low": -1000.0,
+  "random_high": 1000.0,
+  "low_bias": 5.0,
+  "stale_value": 130.0,
+  "poison_honest_offers": 1,
+  "flooding": 0,
+  "churn_period": 0,
+  "selective_p": 1.0,
+  "unresponsive_p": 0.0,
+
+  "epsilon": 0.05,
+  "conv_window_start": 20,
+
+  "docker_port": 8000,
+  "docker_compose_out": "docker/docker-compose.yml"
+}

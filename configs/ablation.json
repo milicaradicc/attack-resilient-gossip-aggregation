@@ -1,38 +1,9 @@
 {
-  "n_honest": [
-    15
-  ],
-  "beta": [
-    0.2
-  ],
-  "overlay": [
-    "eclipse_resistant"
-  ],
-  "aggregation": [
-    "mean",
-    "median",
-    "trimmed_mean"
-  ],
-  "byzantine_profile": [
-    "coordinated",
-    "extreme",
-    "random",
-    "low_biased",
-    "stale"
-  ],
-  "seeds": [
-    1,
-    2,
-    3
-  ],
-  "peer_set_size": 7,
-  "num_rounds": 50,
-  "coordinated_value": 1000.0,
-  "activate_round": 1,
-  "pow_difficulty_bits": 12,
-  "num_buckets": 8,
-  "byzantine_fraction": 0.34,
-  "epsilon": 0.05,
-  "conv_window_start": 20,
-  "trim_alpha": 0.2
+  "n_honest": [15],
+  "beta": [0.2],
+  "overlay": ["eclipse_resistant"],
+  "aggregation": ["mean", "median", "trimmed_mean"],
+  "byzantine_profile": ["coordinated", "extreme", "random", "low_biased", "stale"],
+  "seeds": [1, 2, 3],
+  "activate_round": 1
 }

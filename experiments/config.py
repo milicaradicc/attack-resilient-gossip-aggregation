@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
+
+DEFAULTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "configs", "defaults.json")
+
+SWEEP_KEYS = ("n_honest", "beta", "overlay", "aggregation", "seeds", "byzantine_profile")
 
 
 @dataclass
@@ -28,6 +34,19 @@ class RunSpec:
     timeout_rounds: int
     unresponsive_p: float
     trim_alpha: float = 0.2
+    age_min: int = 3
+    age_max: int = 20
+    exchange_max: int = 20
+    score_threshold: float = 0.5
+    max_per_bucket: int = 2
+    value_low: float = 50.0
+    value_high: float = 150.0
+    poison_honest_offers: int = 1
+    extreme_offset: float = 1000.0
+    random_low: float = -1000.0
+    random_high: float = 1000.0
+    low_bias: float = 5.0
+    stale_value: float = 130.0
 
     def malicious_counts(self) -> Tuple[int, int]:
         if self.beta <= 0.0:
@@ -37,33 +56,69 @@ class RunSpec:
         return n_byzantine, n_mal - n_byzantine
 
 
-def load_matrix(path: str) -> List[RunSpec]:
+def load_defaults(path: str = DEFAULTS_PATH) -> Dict[str, Any]:
     with open(path) as f:
-        c = json.load(f)
+        return json.load(f)
+
+
+def merged_config(path: str = None) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    cfg = load_defaults()
+    override: Dict[str, Any] = {}
+    if path:
+        with open(path) as f:
+            override = json.load(f)
+        cfg.update(override)
+    return cfg, override
+
+
+def _activate_round(c: Dict[str, Any], override: Dict[str, Any]) -> int:
+    if "activate_round" in override:
+        return override["activate_round"]
+    if "warmup" in override:
+        return override["warmup"] + 1
+    if "warmup" in c:
+        return c["warmup"] + 1
+    return c.get("activate_round", 1)
+
+
+def load_matrix(path: str) -> List[RunSpec]:
+    c, override = merged_config(path)
     fixed = dict(
-        peer_set_size=c.get("peer_set_size", 7),
-        num_rounds=c.get("num_rounds", 50),
-        coordinated_value=c.get("coordinated_value", 1000.0),
-        activate_round=(c["warmup"] + 1) if "warmup" in c else c.get("activate_round", 1),
-        pow_difficulty_bits=c.get("pow_difficulty_bits", 12),
-        num_buckets=c.get("num_buckets", 8),
-        byzantine_fraction=c.get("byzantine_fraction", 0.34),
-        epsilon=c.get("epsilon", 0.05),
-        conv_window_start=c.get("conv_window_start", 20),
-        flooding=c.get("flooding", 0),
-        churn_period=c.get("churn_period", 0),
-        selective_p=c.get("selective_p", 1.0),
-        timeout_rounds=c.get("timeout_rounds", 3),
-        unresponsive_p=c.get("unresponsive_p", 0.0),
-        trim_alpha=c.get("trim_alpha", 0.2),
+        peer_set_size=c["peer_set_size"],
+        num_rounds=c["num_rounds"],
+        coordinated_value=c["coordinated_value"],
+        activate_round=_activate_round(c, override),
+        pow_difficulty_bits=c["pow_difficulty_bits"],
+        num_buckets=c["num_buckets"],
+        byzantine_fraction=c["byzantine_fraction"],
+        epsilon=c["epsilon"],
+        conv_window_start=c["conv_window_start"],
+        flooding=c["flooding"],
+        churn_period=c["churn_period"],
+        selective_p=c["selective_p"],
+        timeout_rounds=c["timeout_rounds"],
+        unresponsive_p=c["unresponsive_p"],
+        trim_alpha=c["trim_alpha"],
+        age_min=c["age_min"],
+        age_max=c["age_max"],
+        exchange_max=c["exchange_max"],
+        score_threshold=c["score_threshold"],
+        max_per_bucket=c["max_per_bucket"],
+        value_low=c["value_low"],
+        value_high=c["value_high"],
+        poison_honest_offers=c["poison_honest_offers"],
+        extreme_offset=c["extreme_offset"],
+        random_low=c["random_low"],
+        random_high=c["random_high"],
+        low_bias=c["low_bias"],
+        stale_value=c["stale_value"],
     )
-    profiles = c.get("byzantine_profile", ["coordinated"])
     specs: List[RunSpec] = []
     for nh in c["n_honest"]:
         for beta in c["beta"]:
             for overlay in c["overlay"]:
                 for aggregation in c["aggregation"]:
-                    for profile in profiles:
+                    for profile in c["byzantine_profile"]:
                         for seed in c["seeds"]:
                             specs.append(RunSpec(nh, beta, overlay, aggregation, seed,
                                                  byzantine_profile=profile, **fixed))
