@@ -112,7 +112,7 @@ def run_honest(base, node_id, cfg):
                 continue
             if strategy.accept_peer(node, c, r):
                 if len(node.peers) >= strategy.max_peers:
-                    victim = strategy.evict_peer(node, r)
+                    victim = strategy.evict_peer(node, r, c)
                     if victim is None:
                         continue
                     node.peers.remove(victim)

@@ -32,7 +32,7 @@ def test_reject_duplicate():
 
 def test_evict_returns_existing_peer():
     n = _node()
-    assert RandomStrategy(7).evict_peer(n, round_now=0) in n.peers
+    assert RandomStrategy(len(n.peers)).evict_peer(n, round_now=0) in n.peers
 
 
 def test_evict_empty_returns_none():

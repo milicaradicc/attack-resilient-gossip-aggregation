@@ -56,7 +56,7 @@ class Engine:
                     # ako je komsiluk pun izbaci najslabiji, ubaci novi
                     # TODO sta ako je novi losiji od starog?
                     if len(node.peers) >= self.sampling.max_peers:
-                        victim = self.sampling.evict_peer(node, round_now)
+                        victim = self.sampling.evict_peer(node, round_now, candidate)
                         if victim is None:
                             continue
                         node.peers.remove(victim)

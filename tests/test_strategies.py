@@ -64,7 +64,7 @@ def test_low_score_rejected():
 
 def test_eviction_removes_lowest_score():
     reg = _registry(5, 6)
-    s = SybilResistantStrategy(7, reg, PARAMS)
+    s = SybilResistantStrategy(2, reg, PARAMS)
     n = _node()
     n.peers = [5, 6]
     n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
@@ -82,16 +82,30 @@ def _same_bucket_ids(target_bucket: int, count: int, exclude: set) -> list:
     return out
 
 
-def test_bucket_overflow_rejected():
+def test_bucket_full_replaces_weaker():
     reg = _registry(5)
     n = _node()
     n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
     b = bucket_of(str(5), PARAMS.num_buckets)
     n.peers = _same_bucket_ids(b, PARAMS.max_per_bucket, exclude={5})
 
-    sybil = SybilResistantStrategy(7, reg, PARAMS)
     eclipse = EclipseResistantStrategy(7, reg, PARAMS)
-    assert sybil.accept_peer(n, 5, round_now=20) is True
+    assert eclipse.accept_peer(n, 5, round_now=20) is True
+    victim = eclipse.evict_peer(n, round_now=20, candidate=5)
+    assert victim in n.peers and bucket_of(str(victim), PARAMS.num_buckets) == b
+
+
+def test_bucket_full_rejects_weaker_candidate():
+    members = _same_bucket_ids(bucket_of(str(5), PARAMS.num_buckets), PARAMS.max_per_bucket, exclude={5})
+    reg = _registry(5, *members)
+    n = _node()
+    n.peers = list(members)
+    for m in members:
+        n.observations[m] = Observation(first_seen_round=0, last_seen_round=20,
+                                        successful_exchanges=PARAMS.exchange_max)
+    n.observations[5] = Observation(first_seen_round=14, last_seen_round=20)
+
+    eclipse = EclipseResistantStrategy(7, reg, PARAMS)
     assert eclipse.accept_peer(n, 5, round_now=20) is False
 
 

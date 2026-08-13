@@ -25,7 +25,9 @@ class RandomStrategy:
     def accept_peer(self, node: Node, candidate: int, round_now: int) -> bool:
         return self.reason(node, candidate, round_now) is None
 
-    def evict_peer(self, node: Node, round_now: int) -> Optional[int]:
+    def evict_peer(self, node: Node, round_now: int, candidate: Optional[int] = None) -> Optional[int]:
+        if len(node.peers) < self.max_peers:
+            return None
         return node.peers[0] if node.peers else None
 
     def refresh_peers(self, node: Node, round_now: int, rng: random.Random) -> None:
