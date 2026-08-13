@@ -25,10 +25,12 @@ class Engine:
 
     def _observe(self, node, other, round_now, exchanged):
         obs = node.observations.get(other)
+        # ako peer nije vidjen ranije dodaj observation
         if obs is None:
             node.observations[other] = Observation(
                 first_seen_round=round_now, last_seen_round=round_now,
                 successful_exchanges=1 if exchanged else 0)
+        # ako jeste ziv je i osvezava se
         else:
             obs.last_seen_round = round_now
             if exchanged:
@@ -40,12 +42,19 @@ class Engine:
         reasons = {"invalid_pow": 0, "too_young": 0, "low_score": 0,
                    "bucket_full": 0, "self_or_duplicate": 0}
         for node in self.nodes.values():
+            # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
+            # za svakog: broji ga i zabelezi u dnevnik (vidjanje, ne razmena)
+            # time mu starost pocinje da tece
             for candidate in self.scenario.offer_candidates(node, round_now, self.rng):
                 offered += 1
                 self._observe(node, candidate, round_now, exchanged=False)
+                # ako je kandidat komsija skip
                 if candidate in node.peers:
                     continue
+                # admission !!!!!!!!!!!! -> proverava PoW/starost/skor/bucket
                 if self.sampling.accept_peer(node, candidate, round_now):
+                    # ako je komsiluk pun izbaci najslabiji, ubaci novi
+                    # TODO sta ako je novi losiji od starog?
                     if len(node.peers) >= self.sampling.max_peers:
                         victim = self.sampling.evict_peer(node, round_now)
                         if victim is None:
@@ -53,15 +62,18 @@ class Engine:
                         node.peers.remove(victim)
                     node.peers.append(candidate)
                 else:
+                    #  povecaj brojace
                     why = self.sampling.reason(node, candidate, round_now) or "self_or_duplicate"
                     reasons[why] = reasons.get(why, 0) + 1
         return offered, sum(reasons.values()), reasons
 
     def _broadcast(self, round_now):
+        # napravi snapshot svih cvorova i malicijusa
         out = {}
         for hid, node in self.nodes.items():
             out[hid] = self.scenario.broadcast_value(hid, node.estimate, round_now)
         for m in self.scenario.malicious_ids:
+            # vrati placeholder svakako se ne koristi ta vrednost
             out[m] = self.scenario.broadcast_value(m, 0.0, round_now)
         return out
 
@@ -87,23 +99,27 @@ class Engine:
         return responders, timeouts
 
     def run(self):
+        # sacuvaj prvu rundu
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
 
         for r in range(1, self.num_rounds + 1):
+            # churn
             self.scenario.churn_reset(self.nodes, r)
+            # discover + admission
             offered, rejected, reasons = self._discover(r)
-            broadcast = self._broadcast(r)
+            # na pocetku runce snimak
+            broadcast = self._broadcast(r) # ovde su i napadaci, own samo honest
             own = {hid: n.estimate for hid, n in self.nodes.items()}
 
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng)
+                peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
                 responders, t = self._heartbeat(node, peers, r)
                 timeouts += t
-                received = [broadcast[p] for p in responders]
+                received = [broadcast[p] for p in responders] # pokupi vrednosti onih koji su odgovorili
                 data_msgs += len(received)
-                node.estimate = self.aggregation.aggregate(own[hid], received)
+                node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
 
             counters = RoundCounters(
                 data_msgs=data_msgs, control_msgs=offered + rejected,

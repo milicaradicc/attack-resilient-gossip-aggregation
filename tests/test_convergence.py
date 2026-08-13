@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from experiments.setup import RunConfig
+from core.setup import RunConfig
 from experiments.scenarios import run_benign as run
 
 

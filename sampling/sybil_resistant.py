@@ -8,6 +8,15 @@ from identity.pow import verify_pow
 from identity.registry import IdentityParams, IdentityRegistry
 from identity.scoring import identity_score
 
+# sybil-resistant strategija uvodi admission uslove: validan PoW, minimalnu starost identiteta i dovoljan identity score.
+# 4.5.2. Sybil-resistant strategija 
+# Sybil-resistant strategija uvodi tri admission uslova: 
+# 1. validan PoW,  
+# 2. minimalni age,  
+# 3. minimalni identity score.  
+# Peer kandidat se prihvata samo ako zadovoljava sve uslove i ima bolji score od postojećih slabih peer-ova. 
+# Eviction preferira peer-ove sa najmanjim score-om ili peer-ove koji ne odgovaraju dovoljno dugo. Ciljevi 
+# su ograničavanje Sybil penetracije i favorizovanje stabilnih peer-ova. 
 
 class SybilResistantStrategy:
     name = "sybil_resistant"

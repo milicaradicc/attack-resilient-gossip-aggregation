@@ -6,15 +6,15 @@ from typing import Dict, List, Set
 
 
 def build_random_overlay(n: int, k: int, rng: random.Random) -> Dict[int, List[int]]:
-    adj: Dict[int, Set[int]] = {i: set() for i in range(n)}
+    adj: Dict[int, Set[int]] = {i: set() for i in range(n)} # za svaki cvor prazan set komsija
     for i in range(n):
-        candidates = [j for j in range(n) if j != i]
-        rng.shuffle(candidates)
-        for j in candidates[:k]:
+        candidates = [j for j in range(n) if j != i] # kandidati su svi ostali cvorovi sem njega samog 
+        rng.shuffle(candidates) # deterministicko mesanje
+        for j in candidates[:k]: # uzme k iz te liste 
             adj[i].add(j)
             adj[j].add(i)
     _ensure_connected(adj, rng)
-    return {i: sorted(adj[i]) for i in range(n)}
+    return {i: sorted(adj[i]) for i in range(n)} # akup nema redosled pa se sortira
 
 
 def _ensure_connected(adj: Dict[int, Set[int]], rng: random.Random) -> None:

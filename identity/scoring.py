@@ -1,6 +1,20 @@
 from __future__ import annotations
 
 
+# 4.4.3. Identity scoring 
+# Za svakog peer kandidata računa se score: 
+# 1/3 (age+exchange+pow)
+
+# Score se koristi za: 
+# • admission,  
+# • eviction,  
+# • i peer prioritizaciju.  
+
+# Peer sa većim score-om smatra se stabilnijim i pouzdanijim. Ciljevi su favorizovanje dugotrajnih i stabilnih 
+# peer-ova i ograničavanje uticaja novih identiteta.  
+
+# TODO peer priotarizacija
+
 def score_age(round_now: int, first_seen_round: int, age_max: int) -> float:
     return max(0.0, min((round_now - first_seen_round) / age_max, 1.0))
 

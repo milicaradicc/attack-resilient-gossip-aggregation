@@ -3,6 +3,13 @@ from __future__ import annotations
 import hashlib
 
 
+# 4.4.1. Proof-of-Work validacija 
+# Svaki identitet mora posedovati validan proof-of-work. Koristi se 𝑆𝐻𝐴256(𝑖𝑑 ∥ 𝑛𝑜𝑛𝑐𝑒) sa uslovom 
+# “određeni broj vodećih nula bita”. Cilj PoW mehanizma nije jaka kriptografska zaštita, već povećanje cene 
+# masovne proizvodnje identiteta i usporavanje Sybil flood napada. PoW se proverava prilikom peer 
+# admission procesa i peer refresh-a.  
+
+
 def pow_hash(identity: str, nonce: int) -> bytes:
     return hashlib.sha256(f"{identity}||{nonce}".encode()).digest()
 

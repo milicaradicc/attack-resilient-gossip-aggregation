@@ -6,6 +6,7 @@ from typing import Dict, Optional
 
 @dataclass
 class IdentityParams:
+    # TODO kako opravdati ovde vrednosti
     pow_difficulty_bits: int = 12
     age_min: int = 3
     age_max: int = 20

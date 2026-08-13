@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from attacks.scenario import AttackParams, Scenario
 from core.node import Node
-from experiments.setup import RunConfig
+from core.setup import RunConfig
 from experiments.scenarios import AttackConfig, run_attack as run
 from identity.registry import IdentityParams
 

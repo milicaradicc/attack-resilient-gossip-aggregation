@@ -10,7 +10,7 @@ sys.path.insert(0, ROOT)
 from docker.controller_service import ControllerState, serve
 from docker.node_service import run_node
 from experiments.scenarios import AttackConfig, run_attack, run_benign
-from experiments.setup import RunConfig
+from core.setup import RunConfig
 from identity.registry import IdentityParams
 
 BENIGN_ACTIVATE = 10 ** 9

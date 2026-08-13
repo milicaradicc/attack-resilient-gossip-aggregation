@@ -1,4 +1,5 @@
-from aggregation.base import AggregationStrategy, MeanAggregation
+from aggregation.base import AggregationStrategy
+from aggregation.mean import MeanAggregation
 from aggregation.median import MedianAggregation
 from aggregation.trimmed_mean import TrimmedMeanAggregation
 

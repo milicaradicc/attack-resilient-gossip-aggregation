@@ -29,18 +29,23 @@ def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
         i: Node.create(i, val_rng.uniform(cfg.value_low, cfg.value_high))
         for i in range(cfg.n_honest)
     }
+    # svakon cvoru se dodeljuju komsije, pravi se topologija
     for i, peers in build_random_overlay(cfg.n_honest, cfg.peer_set_size, top_rng).items():
         nodes[i].peers = peers
     return nodes # {0: Node, 1: Node, ...}
 
 
 def seed_observations(nodes: Dict[int, Node]) -> None:
+    # za svaki cvor za svaki peer se belezi starost, od runde 0
+    # starost identiteta se računa kao (trenutna_runda - first_seen)
+    # TODO proveriti ostala polja jel se update kako treba
     for node in nodes.values():
         for peer in node.peers:
             node.observations[peer] = Observation(first_seen_round=0, last_seen_round=0)
 
 
 def register_all(ids: Set[int], params: IdentityParams) -> IdentityRegistry:
+    # resavanje pow da bi se registrovali
     registry = IdentityRegistry()
     for i in ids:
         registry.register(i, solve_pow(str(i), params.pow_difficulty_bits))

@@ -72,12 +72,13 @@ def _build(cfg):
                         AttackParams(**cfg["attack"]))
     return params, registry, scenario
 
-
+# TODO rekaforisati isto kao u engine-u je
 def _observe(node, other, r, exchanged):
     obs = node.observations.get(other)
     if obs is None:
-        node.observations[other] = Observation(first_seen_round=r, last_seen_round=r,
-                                                successful_exchanges=1 if exchanged else 0)
+        node.observations[other] = Observation(
+            first_seen_round=r, last_seen_round=r,
+            successful_exchanges=1 if exchanged else 0)
     else:
         obs.last_seen_round = r
         if exchanged:

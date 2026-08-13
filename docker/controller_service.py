@@ -63,31 +63,36 @@ class ControllerState:
         self.n = len(nodes)
         self.assignments = {i: {"x_local": n.x_local, "peers": list(n.peers)}
                             for i, n in nodes.items()}
-        honest = set(nodes.keys())
-        byzantine = set(range(self.n, self.n + n_byzantine))
+        honest = set(nodes.keys()) # 0...n-1
+        byzantine = set(range(self.n, self.n + n_byzantine)) # n...nb
         sybil = set(range(self.n + n_byzantine, self.n + n_byzantine + n_sybil))
         self.honest, self.byzantine, self.sybil = honest, byzantine, sybil
         self.n_total = self.n + n_byzantine + n_sybil
         self.registry = register_all(honest | byzantine | sybil, id_params)
-        self.x_star = mean(n.x_local for n in nodes.values())
+        self.x_star = mean(n.x_local for n in nodes.values()) # prava srednja vrednost, sistem ovo treba da pogodi
         self.num_rounds = cfg.num_rounds
 
         self.params = AttackParams(
-            byzantine_profile=byzantine_profile, coordinated_value=coordinated_value,
-            x_star=self.x_star, activate_round=activate_round, flooding=flooding,
-            churn_period=churn_period, selective_p=selective_p, unresponsive_p=unresponsive_p)
+            byzantine_profile=byzantine_profile, 
+            coordinated_value=coordinated_value,
+            x_star=self.x_star, 
+            activate_round=activate_round, 
+            flooding=flooding,
+            churn_period=churn_period, 
+            selective_p=selective_p, 
+            unresponsive_p=unresponsive_p)
         self.scenario = Scenario(honest, byzantine, sybil, self.params)
         self.rng = make_rng(cfg.global_seed, "attack")
 
         self.peers_in = {}
-        self.offers = {}
+        self.offers = {} # kes kandidata 
         self.offers_done = set()
         self.broadcasts = {}
         self.reports = {}
         self.recorded = set()
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
         self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=id_params.num_buckets)
-        self.metrics.record(0, self.stubs, self.scenario, RoundCounters())
+        self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
         self.rows = []
         self.lock = threading.Lock()
 
@@ -102,7 +107,8 @@ class ControllerState:
             "registry": {str(k): v for k, v in self.registry.nonces.items()},
             "id_params": {
                 "pow_difficulty_bits": self.id_params.pow_difficulty_bits,
-                "age_min": self.id_params.age_min, "age_max": self.id_params.age_max,
+                "age_min": self.id_params.age_min, 
+                "age_max": self.id_params.age_max,
                 "exchange_max": self.id_params.exchange_max,
                 "score_threshold": self.id_params.score_threshold,
                 "num_buckets": self.id_params.num_buckets,
@@ -113,17 +119,22 @@ class ControllerState:
                 "byzantine_profile": self.params.byzantine_profile,
                 "coordinated_value": self.params.coordinated_value,
                 "extreme_offset": self.params.extreme_offset,
-                "random_low": self.params.random_low, "random_high": self.params.random_high,
-                "low_bias": self.params.low_bias, "stale_value": self.params.stale_value,
-                "x_star": self.params.x_star, "activate_round": self.params.activate_round,
+                "random_low": self.params.random_low, 
+                "random_high": self.params.random_high,
+                "low_bias": self.params.low_bias, 
+                "stale_value": self.params.stale_value,
+                "x_star": self.params.x_star, 
+                "activate_round": self.params.activate_round,
                 "poison_honest_offers": self.params.poison_honest_offers,
-                "flooding": self.params.flooding, "churn_period": self.params.churn_period,
+                "flooding": self.params.flooding, 
+                "churn_period": self.params.churn_period,
                 "selective_p": self.params.selective_p,
                 "unresponsive_p": self.params.unresponsive_p,
             },
         }
 
     def maybe_build_offers(self, r):
+        # ako su kandidati za ovu rundu vec napravljeni, ili jos nisu svi cvorovi prijavili komsije — izadji
         if r in self.offers_done or len(self.peers_in.get(r, {})) < self.n:
             return
         for i in range(self.n):

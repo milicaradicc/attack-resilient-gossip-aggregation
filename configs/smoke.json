@@ -3,22 +3,16 @@
     10
   ],
   "beta": [
-    0.0,
     0.3
   ],
   "overlay": [
-    "random",
-    "sybil_resistant",
-    "eclipse_resistant"
+    "random"
   ],
   "aggregation": [
-    "mean",
-    "median",
-    "trimmed_mean"
+    "mean"
   ],
   "seeds": [
-    1,
-    2
+    1
   ],
   "peer_set_size": 7,
   "num_rounds": 30,

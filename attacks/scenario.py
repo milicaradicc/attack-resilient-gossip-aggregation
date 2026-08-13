@@ -77,14 +77,19 @@ class Scenario:
     def offer_candidates(self, node: Node, round_now: int, rng: random.Random) -> List[int]:
         if not self.active(round_now):
             return []
+        # POISONING!!!!!!!!!!!!!!!!!
+        # za svaki honest čvor, u listu kandidata se stave svi napadači (koji već nisu njegove komšije)
+        # to modeluje situaciju gde napadač (ili kompromitovan peer) preporučuje druge napadače
         offers = [m for m in sorted(self.malicious_ids) if m not in node.peers]
+        # u pravom sistemu čvor bi otkrivao i honest i napadačke kandidate, ne samo napadače
+        # ovo je „šum" da poisoning ne bude previše očigledan (da nije samo napadači u ponudi)
         honest_pool = [
             h for h in sorted(self.honest_ids)
             if h != node.node_id and h not in node.peers
         ]
         rng.shuffle(honest_pool)
         offers.extend(honest_pool[: self.params.poison_honest_offers])
-        if self.params.flooding > 0:
+        if self.params.flooding > 0: # FLOODING!!!!!!!!!!!!!!!!!
             offers.extend(FLOOD_BASE + i for i in range(self.params.flooding))
         return offers
 

@@ -11,21 +11,29 @@ from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
 from experiments.config import RunSpec, load_matrix
 from experiments.engine import Engine
-from experiments.setup import RunConfig, build_nodes
-from identity.observation import Observation
-from identity.pow import solve_pow
+from core.setup import RunConfig, build_nodes, seed_observations, register_all
 from identity.registry import IdentityParams, IdentityRegistry
 from metrics.experiment_metrics import FIELDS, ExperimentMetrics
 from sampling import get_strategy
 
 CONFIG_FIELDS = ["n_honest", "beta", "overlay", "aggregation", "byzantine_profile", "seed"]
-SUMMARY_FIELDS = [
-    "final_err_rel", "convergence_time", "stability",
-    "data_overhead", "control_overhead", "rejected_ratio",
-    "bucket_occupancy", "rej_pow", "rej_age", "rej_score", "rej_bucket",
-    "final_sybil_penetration", "final_eclipse_rate",
-]
 
+SUMMARY_FIELDS = [
+    "final_err_rel", # relativna greska agregacije
+    "convergence_time", # vreme konvergencije
+    "stability", # stabilnost procene 
+    "data_overhead", # 6.3.8  data overhead
+    "control_overhead", # 6.3.7 kontrolni overhead
+    "rejected_ratio", # 6.3.9 rejected peer ratio
+    "bucket_occupancy", # 6.3.10 bucket occupancy distribucija
+    "rej_pow", 
+    "rej_age", 
+    "rej_score", 
+    "rej_bucket",
+    "final_sybil_penetration", # 6.3.4 sybil penetration 
+    "final_eclipse_rate", # 6.3.5 eclipse success rate
+]
+# 6.3.6 peer diversity
 
 def run_single(spec: RunSpec) -> ExperimentMetrics:
     base = RunConfig(
@@ -35,9 +43,7 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
         global_seed=spec.seed,
     )
     nodes = build_nodes(base)
-    for node in nodes.values():
-        for peer in node.peers:
-            node.observations[peer] = Observation(first_seen_round=0, last_seen_round=0)
+    seed_observations(nodes)
 
     honest = set(nodes.keys())
     n_byzantine, n_sybil = spec.malicious_counts()
@@ -49,9 +55,7 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
         pow_difficulty_bits=spec.pow_difficulty_bits,
         num_buckets=spec.num_buckets,
     )
-    registry = IdentityRegistry()
-    for i in honest | byzantine | sybil:
-        registry.register(i, solve_pow(str(i), id_params.pow_difficulty_bits))
+    registry = register_all(honest | byzantine | sybil, id_params)
 
     x_star = Engine.true_mean(nodes)
     if n_byzantine + n_sybil == 0:
