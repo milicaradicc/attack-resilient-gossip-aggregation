@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import argparse
 
+from core.setup import malicious_counts
 from experiments.config import load_defaults
 
 
 def counts(n_honest, beta, byzantine_fraction=None):
+    # ista formula kao u core/setup.py (jedno mesto)
     if byzantine_fraction is None:
         byzantine_fraction = load_defaults()["byzantine_fraction"]
-    n_mal = round(n_honest * beta / (1.0 - beta)) if beta > 0 else 0
-    n_byz = round(n_mal * byzantine_fraction)
-    return n_byz, n_mal - n_byz
+    return malicious_counts(n_honest, beta, byzantine_fraction)
 
 
 def generate(args):

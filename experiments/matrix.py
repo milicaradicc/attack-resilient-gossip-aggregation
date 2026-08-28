@@ -12,7 +12,7 @@ from core.rng import make_rng
 from experiments.config import RunSpec, load_matrix
 from core.engine import Engine
 from core.setup import RunConfig, build_nodes, seed_observations, register_all
-from identity.registry import IdentityParams, IdentityRegistry
+from identity.registry import IdentityParams
 from metrics.experiment_metrics import FIELDS, ExperimentMetrics
 from sampling import get_strategy
 

@@ -9,7 +9,7 @@ from statistics import mean
 
 from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
-from core.setup import RunConfig, build_nodes, register_all, seed_observations
+from core.setup import RunConfig, build_nodes, malicious_counts, register_all, seed_observations
 from identity.registry import IdentityParams
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
@@ -97,7 +97,6 @@ class ControllerState:
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
         self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=id_params.num_buckets)
         self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
-        self.rows = []
         self.lock = threading.Lock()
 
     def config_payload(self):
@@ -201,9 +200,6 @@ def make_handler(state):
                     ready = (r, i) in state.offers
                     offers = state.offers.get((r, i))
                 self._send(200 if ready else 425, {"offers": offers} if ready else {"ready": False})
-            elif parts[0] == "rows":
-                self._send(200, {"rows": state.rows, "num_rounds": state.num_rounds,
-                                 "x_star": state.x_star})
             else:
                 self._send(404, {})
 
@@ -253,9 +249,8 @@ def _write_results(state, path):
 def main():
     n_honest = int(os.environ.get("N_HONEST", "15"))
     beta = float(os.environ.get("BETA", "0.3"))
-    n_mal = round(n_honest * beta / (1.0 - beta)) if beta > 0 else 0
-    n_byz = round(n_mal * float(os.environ.get("BYZANTINE_FRACTION", "0.34")))
-    n_syb = n_mal - n_byz
+    n_byz, n_syb = malicious_counts(
+        n_honest, beta, float(os.environ.get("BYZANTINE_FRACTION", "0.34")))
     cfg = RunConfig(n_honest=n_honest, peer_set_size=int(os.environ.get("PEER_SET_SIZE", "7")),
                     num_rounds=int(os.environ.get("ROUNDS", "50")),
                     global_seed=int(os.environ.get("SEED", "42")))

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+
+from core.setup import malicious_counts as core_malicious_counts
 from typing import Any, Dict, List, Tuple
 
 DEFAULTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -49,11 +51,7 @@ class RunSpec:
     stale_value: float = 130.0
 
     def malicious_counts(self) -> Tuple[int, int]:
-        if self.beta <= 0.0:
-            return 0, 0
-        n_mal = round(self.n_honest * self.beta / (1.0 - self.beta))
-        n_byzantine = round(n_mal * self.byzantine_fraction)
-        return n_byzantine, n_mal - n_byzantine
+        return core_malicious_counts(self.n_honest, self.beta, self.byzantine_fraction)
 
 
 def load_defaults(path: str = DEFAULTS_PATH) -> Dict[str, Any]:

@@ -8,6 +8,7 @@ import urllib.request
 
 from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
+from core import round_ops
 from core.node import Node
 from identity.observation import Observation
 from identity.registry import IdentityParams, IdentityRegistry
@@ -79,18 +80,6 @@ def _build(cfg):
     return params, registry, scenario
 
 
-def _observe(node, other, r, exchanged):
-    obs = node.observations.get(other)
-    if obs is None:
-        node.observations[other] = Observation(first_seen_round=r, last_seen_round=r,
-                                                successful_exchanges=1 if exchanged else 0)
-    else:
-        obs.last_seen_round = r
-        if exchanged:
-            obs.successful_exchanges += 1
-            obs.missed_heartbeats = 0
-
-
 def run_honest(base, node_id, cfg, job=None):
     params, registry, scenario = _build(cfg)
     apath = f"{base}/assignment/{node_id}" if job is None else f"{base}/assignment/{job}/{node_id}"
@@ -111,24 +100,8 @@ def run_honest(base, node_id, cfg, job=None):
         opath = f"{base}/offers/{node_id}/{r}" if job is None else f"{base}/offers/{job}/{node_id}/{r}"
         offers = _block_get(opath)["offers"]
 
-        reasons = {"invalid_pow": 0, "too_young": 0, "low_score": 0,
-                   "bucket_full": 0, "self_or_duplicate": 0}
-        for c in offers:
-            _observe(node, c, r, exchanged=False)
-            if c in node.peers:
-                continue
-            if strategy.accept_peer(node, c, r):
-                victim = strategy.evict_peer(node, r, c)
-                if victim is not None:
-                    node.peers.remove(victim)
-                elif len(node.peers) >= strategy.max_peers:
-                    continue
-                node.peers.append(c)
-            else:
-                why = strategy.reason(node, c, r) or "self_or_duplicate"
-                reasons[why] += 1
-        offered = len(offers)
-        rejected = sum(reasons.values())
+        # ista admission logika koju koristi i in-process Engine
+        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r)
 
         own = node.estimate
         _block_post(f"{base}/broadcast", _tag(
@@ -136,24 +109,9 @@ def run_honest(base, node_id, cfg, job=None):
         vals = _block_post(f"{base}/values", _tag(
             {"node_id": node_id, "round": r, "peers": node.peers}, job))["values"]
 
-        responders = []
-        for p in node.peers:
-            if scenario.responds(p, r, None):
-                _observe(node, p, r, exchanged=True)
-                responders.append(p)
-            else:
-                obs = node.observations.get(p)
-                if obs is not None:
-                    obs.missed_heartbeats += 1
-        timeouts = 0
-        if timeout_rounds > 0:
-            for p in list(node.peers):
-                obs = node.observations.get(p)
-                if obs is not None and obs.missed_heartbeats > timeout_rounds:
-                    node.peers.remove(p)
-                    timeouts += 1
-                    if p in responders:
-                        responders.remove(p)
+        # isti heartbeat/timeout mehanizam kao in-process
+        responders, timeouts = round_ops.heartbeat(
+            node, list(node.peers), scenario, r, None, timeout_rounds)
         received = [vals[str(p)] for p in responders if str(p) in vals]
         node.estimate = aggregation.aggregate(own, received)
 

@@ -50,3 +50,14 @@ def register_all(ids: Set[int], params: IdentityParams) -> IdentityRegistry:
     for i in ids:
         registry.register(i, solve_pow(str(i), params.pow_difficulty_bits))
     return registry
+
+
+def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
+    # beta je udeo zlonamernih u CELOJ mrezi: beta = n_mal / (n_honest + n_mal)
+    # resavanjem po n_mal dobija se n_mal = n_honest * beta / (1 - beta)
+    # jedno mesto za ovu formulu; koriste je i config, i gen_compose, i controller
+    if beta <= 0.0:
+        return 0, 0
+    n_mal = round(n_honest * beta / (1.0 - beta))
+    n_byzantine = round(n_mal * byzantine_fraction)
+    return n_byzantine, n_mal - n_byzantine
