@@ -10,7 +10,7 @@ from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
 from experiments.config import RunSpec, load_matrix
-from experiments.engine import Engine
+from core.engine import Engine
 from core.setup import RunConfig, build_nodes, seed_observations, register_all
 from identity.registry import IdentityParams, IdentityRegistry
 from metrics.experiment_metrics import FIELDS, ExperimentMetrics

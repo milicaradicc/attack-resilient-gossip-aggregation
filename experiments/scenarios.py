@@ -6,7 +6,7 @@ from typing import List, Set, Tuple
 from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
-from experiments.engine import Engine
+from core.engine import Engine
 from core.setup import RunConfig, build_nodes, register_all, seed_observations
 from identity.registry import IdentityParams
 from metrics.experiment_metrics import ExperimentMetrics

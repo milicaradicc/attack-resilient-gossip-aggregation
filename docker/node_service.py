@@ -62,6 +62,12 @@ def _block_post(url, obj, poll=0.05):
         time.sleep(poll)
 
 
+def _tag(payload, job):
+    if job is not None:
+        payload["job"] = job
+    return payload
+
+
 def _build(cfg):
     ip = cfg["id_params"]
     params = IdentityParams(**ip)
@@ -72,13 +78,12 @@ def _build(cfg):
                         AttackParams(**cfg["attack"]))
     return params, registry, scenario
 
-# TODO rekaforisati isto kao u engine-u je
+
 def _observe(node, other, r, exchanged):
     obs = node.observations.get(other)
     if obs is None:
-        node.observations[other] = Observation(
-            first_seen_round=r, last_seen_round=r,
-            successful_exchanges=1 if exchanged else 0)
+        node.observations[other] = Observation(first_seen_round=r, last_seen_round=r,
+                                                successful_exchanges=1 if exchanged else 0)
     else:
         obs.last_seen_round = r
         if exchanged:
@@ -86,9 +91,10 @@ def _observe(node, other, r, exchanged):
             obs.missed_heartbeats = 0
 
 
-def run_honest(base, node_id, cfg):
+def run_honest(base, node_id, cfg, job=None):
     params, registry, scenario = _build(cfg)
-    _, assign = _get(f"{base}/assignment/{node_id}")
+    apath = f"{base}/assignment/{node_id}" if job is None else f"{base}/assignment/{job}/{node_id}"
+    _, assign = _get(apath)
     node = Node.create(node_id, assign["x_local"])
     node.peers = list(assign["peers"])
     for p in node.peers:
@@ -101,8 +107,9 @@ def run_honest(base, node_id, cfg):
 
     for r in range(1, cfg["num_rounds"] + 1):
         scenario.churn_reset({node_id: node}, r)
-        _block_post(f"{base}/peers", {"node_id": node_id, "round": r, "peers": node.peers})
-        offers = _block_get(f"{base}/offers/{node_id}/{r}")["offers"]
+        _block_post(f"{base}/peers", _tag({"node_id": node_id, "round": r, "peers": node.peers}, job))
+        opath = f"{base}/offers/{node_id}/{r}" if job is None else f"{base}/offers/{job}/{node_id}/{r}"
+        offers = _block_get(opath)["offers"]
 
         reasons = {"invalid_pow": 0, "too_young": 0, "low_score": 0,
                    "bucket_full": 0, "self_or_duplicate": 0}
@@ -111,11 +118,11 @@ def run_honest(base, node_id, cfg):
             if c in node.peers:
                 continue
             if strategy.accept_peer(node, c, r):
-                if len(node.peers) >= strategy.max_peers:
-                    victim = strategy.evict_peer(node, r, c)
-                    if victim is None:
-                        continue
+                victim = strategy.evict_peer(node, r, c)
+                if victim is not None:
                     node.peers.remove(victim)
+                elif len(node.peers) >= strategy.max_peers:
+                    continue
                 node.peers.append(c)
             else:
                 why = strategy.reason(node, c, r) or "self_or_duplicate"
@@ -124,10 +131,10 @@ def run_honest(base, node_id, cfg):
         rejected = sum(reasons.values())
 
         own = node.estimate
-        _block_post(f"{base}/broadcast",
-                    {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, own, r)})
-        vals = _block_post(f"{base}/values",
-                           {"node_id": node_id, "round": r, "peers": node.peers})["values"]
+        _block_post(f"{base}/broadcast", _tag(
+            {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, own, r)}, job))
+        vals = _block_post(f"{base}/values", _tag(
+            {"node_id": node_id, "round": r, "peers": node.peers}, job))["values"]
 
         responders = []
         for p in node.peers:
@@ -150,19 +157,19 @@ def run_honest(base, node_id, cfg):
         received = [vals[str(p)] for p in responders if str(p) in vals]
         node.estimate = aggregation.aggregate(own, received)
 
-        _block_post(f"{base}/report", {
+        _block_post(f"{base}/report", _tag({
             "node_id": node_id, "round": r, "peers": node.peers, "estimate": node.estimate,
             "offered": offered, "rejected": rejected, "data_msgs": len(received),
             "rej_invalid_pow": reasons["invalid_pow"], "rej_too_young": reasons["too_young"],
             "rej_low_score": reasons["low_score"], "rej_bucket_full": reasons["bucket_full"],
-            "timeouts": timeouts})
+            "timeouts": timeouts}, job))
 
 
-def run_malicious(base, node_id, cfg):
+def run_malicious(base, node_id, cfg, job=None):
     _, _, scenario = _build(cfg)
     for r in range(1, cfg["num_rounds"] + 1):
-        _block_post(f"{base}/broadcast",
-                    {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, 0.0, r)})
+        _block_post(f"{base}/broadcast", _tag(
+            {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, 0.0, r)}, job))
 
 
 def run_node(base, node_id):
@@ -173,10 +180,25 @@ def run_node(base, node_id):
         run_honest(base, node_id, cfg)
 
 
+def run_matrix_node(base, node_id):
+    info = _block_get(f"{base}/jobs")
+    for job in range(info["n_jobs"]):
+        cfg = _block_get(f"{base}/job/{job}")
+        if node_id >= cfg["participants"]:
+            continue
+        if node_id in set(cfg["byzantine"]) | set(cfg["sybil"]):
+            run_malicious(base, node_id, cfg, job)
+        else:
+            run_honest(base, node_id, cfg, job)
+
+
 def main():
     base = os.environ["CONTROLLER_URL"]
     node_id = int(os.environ["NODE_ID"])
-    run_node(base, node_id)
+    if os.environ.get("MODE") == "matrix":
+        run_matrix_node(base, node_id)
+    else:
+        run_node(base, node_id)
     print(f"node {node_id} done", flush=True)
 
 

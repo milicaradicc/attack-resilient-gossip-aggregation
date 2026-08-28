@@ -48,7 +48,8 @@ class ControllerState:
                 churn_period, 
                 selective_p, 
                 trim_alpha, 
-                verbose=False
+                verbose=False,
+                rng=None # matricni rezim salje isti rng kao in-process
                 ):
         self.cfg = cfg
         self.id_params = id_params
@@ -82,14 +83,17 @@ class ControllerState:
             selective_p=selective_p, 
             unresponsive_p=unresponsive_p)
         self.scenario = Scenario(honest, byzantine, sybil, self.params)
-        self.rng = make_rng(cfg.global_seed, "attack")
+        # bez prosledjenog rng-a koristi se "attack" grana; matricni rezim salje
+        # make_rng(seed, "matrix", overlay, aggregation) da redosled ponuda bude
+        # identican in-process matrici
+        self.rng = rng if rng is not None else make_rng(cfg.global_seed, "attack")
 
         self.peers_in = {}
         self.offers = {} # kes kandidata 
         self.offers_done = set()
         self.broadcasts = {}
         self.reports = {}
-        self.recorded = set()
+        self.recorded = {0} # runda 0 se belezi ispod, mora da udje da bi complete() bio tacan
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
         self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=id_params.num_buckets)
         self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
