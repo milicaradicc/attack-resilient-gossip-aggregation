@@ -24,8 +24,8 @@ def generate(args):
         total = args.n_honest + n_byz + n_syb
     env = {
         "ROLE": "controller",
-        **({"MODE": "matrix", "MATRIX_CONFIG": args.matrix, "MATRIX_OUT": args.matrix_out}
-           if args.matrix else {}), "N_HONEST": args.n_honest, "BETA": args.beta,
+        **({"MODE": "matrix", "MATRIX_CONFIG": args.matrix} if args.matrix else {}),
+        **({"MATRIX_OUT": args.matrix_out} if args.matrix and args.matrix_out else {}), "N_HONEST": args.n_honest, "BETA": args.beta,
         "ROUNDS": args.rounds, "SEED": args.seed, "WARMUP": args.warmup,
         "PEER_SET_SIZE": args.peer_set_size, "STRATEGY": args.strategy,
         "AGGREGATION": args.aggregation, "BYZANTINE_PROFILE": args.profile,
@@ -41,7 +41,7 @@ def generate(args):
     for k, v in env.items():
         lines.append(f"      {k}: \"{v}\"")
     lines += ["    ports:", f"      - \"{args.port}:{args.port}\"",
-              "    volumes:", "      - ./results:/app/results"]
+              "    volumes:", "      - ../results:/app/results"]
     for i in range(total):
         lines += [f"  node{i}:",
                   "    build:", "      context: ..", "      dockerfile: docker/Dockerfile",
@@ -75,7 +75,7 @@ def main():
     p.add_argument("--eclipse-targets", type=int, default=d["eclipse_targets"])
     p.add_argument("--selective-p", type=float, default=d["selective_p"])
     p.add_argument("--matrix", default=None)
-    p.add_argument("--matrix-out", default="results/distributed_matrix.csv")
+    p.add_argument("--matrix-out", default=None)
     p.add_argument("--port", type=int, default=d["docker_port"])
     p.add_argument("--out", default=d["docker_compose_out"])
     a = p.parse_args()
@@ -86,7 +86,7 @@ def main():
         from core.config import load_matrix
         print(f"wrote {a.out}: matrix mode, {len(load_matrix(a.matrix))} konfiguracija, "
               f"{total} node containers")
-        print(f"config: {a.matrix} -> {a.matrix_out}")
+        print(f"config: {a.matrix} -> results/docker/")
     else:
         print(f"wrote {a.out}: {a.n_honest} honest + {n_byz} byzantine + {n_syb} sybil "
               f"= {total} node containers")

@@ -178,7 +178,8 @@ def serve(matrix: MatrixState, host: str, port: int):
 
 def main():
     config_path = os.environ.get("MATRIX_CONFIG", "configs/smoke.json")
-    out = os.environ.get("MATRIX_OUT", "results/distributed_matrix.csv")
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    out = os.environ.get("MATRIX_OUT", f"results/docker/{config_name}.csv")
     summary = out.replace(".csv", "_summary.csv")
     json_path = out.replace(".csv", ".json")
     matrix = MatrixState(config_path)
@@ -192,12 +193,6 @@ def main():
             time.sleep(0.2)
         matrix.write(out, summary, json_path)
         print(f"matrix complete: {len(matrix.summaries)} konfiguracija -> {summary}", flush=True)
-        print("=== REZULTAT (summary) ===", flush=True)
-        print(",".join(CONFIG_FIELDS + SUMMARY_FIELDS), flush=True)
-        for j in sorted(matrix.summaries):
-            prefix, s = matrix.summaries[j]
-            print(",".join(str(x) for x in prefix + s), flush=True)
-        print("=== KRAJ REZULTATA ===", flush=True)
 
     threading.Thread(target=watch, daemon=True).start()
     server.serve_forever()

@@ -101,10 +101,15 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/smoke.json")
-    parser.add_argument("--out", default="results/matrix.csv")
+    parser.add_argument("--out", default=None)
     parser.add_argument("--summary", default=None)
     parser.add_argument("--json", default=None)
     args = parser.parse_args()
+    # podrazumevano: results/inprocess/<ime configa>.csv
+    out = args.out or os.path.join(
+        "results", "inprocess",
+        os.path.splitext(os.path.basename(args.config))[0] + ".csv")
+    args.out = out
     summary = args.summary or args.out.replace(".csv", "_summary.csv")
     json_path = args.json or args.out.replace(".csv", ".json")
     n = run_matrix(args.config, args.out, summary, json_path)

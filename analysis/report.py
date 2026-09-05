@@ -177,13 +177,26 @@ def fig_rejection_reasons(summary, beta, out_dir):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--round", default="results/main.csv")
-    parser.add_argument("--summary", default="results/main_summary.csv")
-    parser.add_argument("--ablation", default="results/ablation_summary.csv")
+    # podrazumevano se izvestaj pravi iz rezultata dobijenih u Docker okruzenju;
+    # --source inprocess prebacuje na in-process rezultate
+    parser.add_argument("--source", default="docker", choices=["docker", "inprocess"])
+    parser.add_argument("--round", default=None)
+    parser.add_argument("--summary", default=None)
+    parser.add_argument("--ablation", default=None)
     parser.add_argument("--figures", default="figures")
-    parser.add_argument("--tables", default="results/tables.md")
+    parser.add_argument("--tables", default=None)
     parser.add_argument("--beta", type=float, default=0.3)
     args = parser.parse_args()
+    base = os.path.join("results", args.source)
+    args.round = args.round or os.path.join(base, "main.csv")
+    args.summary = args.summary or os.path.join(base, "main_summary.csv")
+    args.ablation = args.ablation or os.path.join(base, "ablation_summary.csv")
+    args.tables = args.tables or os.path.join(base, "tables.md")
+    if not os.path.exists(args.summary):
+        raise SystemExit(
+            f"nema rezultata: {args.summary}\n"
+            f"pokreni matricu za izvor '{args.source}', ili koristi --source "
+            f"{'inprocess' if args.source == 'docker' else 'docker'}")
 
     os.makedirs(args.figures, exist_ok=True)
     open(args.tables, "w").close()
