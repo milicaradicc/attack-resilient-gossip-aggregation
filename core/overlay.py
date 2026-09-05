@@ -1,36 +1,111 @@
 from __future__ import annotations
 
+import math
 import random
 from collections import deque
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Tuple
 
 
 def build_random_overlay(n: int, k: int, rng: random.Random) -> Dict[int, List[int]]:
-    adj: Dict[int, Set[int]] = {i: set() for i in range(n)} # za svaki cvor prazan set komsija
+    # regularna topologija: svaki cvor ima tacno k suseda.
+    # razlog: gossip usrednjavanje konvergira ka stepenski ponderisanom proseku,
+    # pa nejednaki stepeni pomeraju konsenzus u odnosu na x* i kada nema napada.
+    # napomena: k-regularan graf postoji samo ako je n*k paran; kada nije
+    # (npr. n=15, k=7), jedan cvor dobija k-1 suseda
+    if n <= 1:
+        return {i: [] for i in range(n)}
+    if k >= n:
+        return {i: sorted(j for j in range(n) if j != i) for i in range(n)}
+
+    adj = _regular_graph(n, k, rng)
+    _connect_preserving_degrees(adj, rng)
+    return {i: sorted(adj[i]) for i in range(n)}
+
+
+def _regular_graph(n: int, k: int, rng: random.Random) -> Dict[int, Set[int]]:
+    # polazi se od determinsticke kruzne (circulant) osnove u kojoj svaki cvor
+    # ima tacno k suseda, a zatim se struktura nasumicno promesa zamenama parova
+    # veza koje ne menjaju stepene — tako se dobija slucajan k-regularan graf
+    adj: Dict[int, Set[int]] = {i: set() for i in range(n)}
+    half = k // 2
     for i in range(n):
-        candidates = [j for j in range(n) if j != i] # kandidati su svi ostali cvorovi sem njega samog 
-        rng.shuffle(candidates) # deterministicko mesanje
-        for j in candidates[:k]: # uzme k iz te liste 
+        for d in range(1, half + 1):
+            j = (i + d) % n
             adj[i].add(j)
             adj[j].add(i)
-    _ensure_connected(adj, rng)
-    return {i: sorted(adj[i]) for i in range(n)} # akup nema redosled pa se sortira
+    if k % 2 == 1:
+        if n % 2 == 0:
+            for i in range(n // 2):
+                j = i + n // 2
+                adj[i].add(j)
+                adj[j].add(i)
+        else:
+            # n i k su oba neparni -> k-regularan graf ne postoji (n*k je neparan),
+            # pa jedan cvor nuzno ostaje sa k-1 suseda. Preostali cvorovi se uparuju
+            # duz rastojanja koje kruzna osnova nije zauzela, da se ne ponovi veza
+            step = half + 1
+            while step < n and math.gcd(step, n) != 1:
+                step += 1
+            cycle = [(step * t) % n for t in range(n)]
+            for a, b in zip(cycle[0:n - 1:2], cycle[1:n - 1:2]):
+                adj[a].add(b)
+                adj[b].add(a)
+    _shuffle_preserving_degrees(adj, rng)
+    return adj
 
 
-def _ensure_connected(adj: Dict[int, Set[int]], rng: random.Random) -> None:
+def _shuffle_preserving_degrees(adj: Dict[int, Set[int]], rng: random.Random,
+                                rounds: int = 20) -> None:
+    # zamena dva para veza: (a,b) i (c,d) -> (a,c) i (b,d); stepeni ostaju isti
+    n_edges = sum(len(v) for v in adj.values()) // 2
+    for _ in range(rounds * n_edges):
+        edges = _edges(adj)
+        (a, b) = rng.choice(edges)
+        (c, d) = rng.choice(edges)
+        if len({a, b, c, d}) < 4:
+            continue
+        if c in adj[a] or d in adj[b]:
+            continue
+        adj[a].discard(b); adj[b].discard(a)
+        adj[c].discard(d); adj[d].discard(c)
+        adj[a].add(c); adj[c].add(a)
+        adj[b].add(d); adj[d].add(b)
+
+
+def _edges(adj: Dict[int, Set[int]]) -> List[Tuple[int, int]]:
+    return [(a, b) for a in adj for b in adj[a] if a < b]
+
+
+def _connect_preserving_degrees(adj: Dict[int, Set[int]], rng: random.Random) -> None:
+    # spajanje komponenti zamenom parova veza: (a,b) i (c,d) se uklone,
+    # a dodaju se (a,c) i (b,d) — stepeni ostaju isti, komponente se spajaju
     components = _components(adj)
     while len(components) > 1:
-        a = rng.choice(list(components[0]))
-        b = rng.choice(list(components[1]))
-        adj[a].add(b)
-        adj[b].add(a)
+        first, second = components[0], components[1]
+        e1 = [e for e in _edges(adj) if e[0] in first]
+        e2 = [e for e in _edges(adj) if e[0] in second]
+        if not e1 or not e2:
+            return
+        a, b = rng.choice(sorted(e1))
+        c, d = rng.choice(sorted(e2))
+        if c in adj[a] or d in adj[b]:
+            components = _components(adj)
+            continue
+        adj[a].discard(b)
+        adj[b].discard(a)
+        adj[c].discard(d)
+        adj[d].discard(c)
+        adj[a].add(c)
+        adj[c].add(a)
+        adj[b].add(d)
+        adj[d].add(b)
         components = _components(adj)
 
 
 def _components(adj: Dict[int, Set[int]]) -> List[Set[int]]:
     seen: Set[int] = set()
     out: List[Set[int]] = []
-    for start in adj:
+    for start in sorted(adj):
         if start in seen:
             continue
         comp: Set[int] = set()
@@ -39,7 +114,7 @@ def _components(adj: Dict[int, Set[int]]) -> List[Set[int]]:
         while q:
             u = q.popleft()
             comp.add(u)
-            for v in adj[u]:
+            for v in sorted(adj[u]):
                 if v not in seen:
                     seen.add(v)
                     q.append(v)

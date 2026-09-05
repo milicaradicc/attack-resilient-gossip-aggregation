@@ -7,6 +7,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from identity.pow import solve_pow, verify_pow
 
+# 5.2.2. Validacija proof-of-work mehanizma 
+# Proof-of-work validacija proverava: 
+# • da li generator proizvodi validne nonce vrednosti, 
+# • i da li verifier ispravno odbacuje nevalidne identitete. 
+# Testovi proveravaju: 
+# 1. validne identitete, 
+# 2. korumpirane nonce vrednosti, 
+# 3. slučajeve bez nonce-a, 
+# 4. i granične slučajeve. 
+# Za svaki identitet proverava se 𝑣𝑒𝑟𝑖𝑓𝑦_𝑝𝑜𝑤(𝑖𝑑,𝑛𝑜𝑛𝑐𝑒) = 𝑇𝑟𝑢𝑒, samo ako hash zadovoljava definisani 
+# prag. 
+
 BITS = 12
 
 

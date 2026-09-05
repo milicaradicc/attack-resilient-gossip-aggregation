@@ -33,9 +33,13 @@ def test_malicious_responds_when_disabled():
     assert s.responds(2, 5, RNG) is True
 
 
-def _spec(unresponsive_p, timeout_rounds):
-    return RunSpec(10, 0.3, "sybil_resistant", "mean", 1, 7, 50, 1000.0, 11, 8, 8, 0.34,
-                   0.05, 20, "coordinated", 0, 0, 1.0, timeout_rounds, unresponsive_p)
+def _spec(unresponsive_p, timeout_rounds, overlay="random"):
+    # referentna strategija se koristi da bi cutljivi napadaci uopste usli u peer set;
+    # tek tada heartbeat ima koga da izbaci
+    from core.config import spec_from
+    return spec_from(n_honest=10, beta=0.3, overlay=overlay, aggregation="mean",
+                     seed=1, num_rounds=50, activate_round=1, pow_difficulty_bits=8,
+                     timeout_rounds=timeout_rounds, unresponsive_p=unresponsive_p)
 
 
 def test_timeout_evicts_silent_peers():
