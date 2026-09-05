@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import random
+
+from core.rng import make_rng
 from typing import Dict, List, Optional, Protocol, Set, runtime_checkable
 
 # 5.1.6: svaki napad je nezavisan modul iza zajednickog interfejsa.
@@ -9,6 +11,13 @@ from typing import Dict, List, Optional, Protocol, Set, runtime_checkable
 # ukljucivati nezavisno i kombinovati u istom eksperimentu.
 
 FLOOD_BASE = 10_000
+
+
+def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Random:
+    # 4.10: svaki izvor randomness-a izvodi se iz globalnog eksperimentalnog seed-a.
+    # Ugradjeni hash() se NE koristi jer je nasumican po procesu (PYTHONHASHSEED),
+    # pa bi isti eksperiment davao razlicite rezultate izmedju pokretanja.
+    return make_rng(ctx.params.experiment_seed, purpose, identity, round_now)
 
 
 class AttackContext:

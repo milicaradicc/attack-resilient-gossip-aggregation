@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import Optional
 
-from attacks.base import AttackContext, BaseAttack
+from attacks.base import AttackContext, BaseAttack, module_rng
 
 # 3.7: Byzantine cvorovi salju proizvoljne ili koordinisane agregacione vrednosti.
 # Tip manipulacije bira se profilom: coordinated (glavni), extreme, random,
@@ -22,7 +22,7 @@ class ByzantineAttack(BaseAttack):
         if prof == "extreme":
             return p.x_star + p.extreme_offset
         if prof == "random":
-            r = random.Random(hash((identity, round_now, "rnd")))
+            r = module_rng(ctx, identity, round_now, "byzantine_random")
             return r.uniform(p.random_low, p.random_high)
         if prof == "low_biased":
             return p.x_star + p.low_bias

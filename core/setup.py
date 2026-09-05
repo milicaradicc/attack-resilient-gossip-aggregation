@@ -126,6 +126,7 @@ def build_world(spec) -> World:
             stale_value=spec.stale_value,
             poison_honest_offers=spec.poison_honest_offers,
             x_star=x_star,
+            experiment_seed=spec.seed, # 4.10: randomness napada se izvodi iz istog seed-a
             activate_round=spec.activate_round,
             flooding=spec.flooding,
             churn_period=spec.churn_period,

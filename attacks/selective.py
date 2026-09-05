@@ -3,7 +3,7 @@ from __future__ import annotations
 import random
 from typing import Optional
 
-from attacks.base import AttackContext, BaseAttack
+from attacks.base import AttackContext, BaseAttack, module_rng
 
 # 3.9: selective forwarding i unresponsive ponasanje.
 # Napadac povremeno prosledjuje korektnu vrednost (da izbegne detekciju)
@@ -21,7 +21,7 @@ class SelectiveForwardingAttack(BaseAttack):
         p = ctx.params
         if p.selective_p >= 1.0 or identity not in ctx.malicious_ids:
             return None
-        r = random.Random(hash((identity, round_now, "sel")))
+        r = module_rng(ctx, identity, round_now, "selective")
         # sa verovatnocom (1 - selective_p) napadac emituje korektnu vrednost
         return p.x_star if r.random() > p.selective_p else None
 
@@ -29,5 +29,5 @@ class SelectiveForwardingAttack(BaseAttack):
         p = ctx.params
         if p.unresponsive_p <= 0.0 or identity not in ctx.malicious_ids:
             return None
-        r = random.Random(hash((identity, round_now, "resp")))
+        r = module_rng(ctx, identity, round_now, "unresponsive")
         return r.random() >= p.unresponsive_p

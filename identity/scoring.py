@@ -42,4 +42,5 @@ def identity_score(
     s_pow = 1.0 if pow_valid else 0.0
     # osnovni skor iz specifikacije (4.4.3), umanjen za nepouzdanost peer-a
     base = (s_age + s_exchange + s_pow) / 3.0
+    # ako peer ne odgovara skroz opada
     return base * score_reliability(missed_total, exchange_max)
