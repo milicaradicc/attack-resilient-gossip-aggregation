@@ -4,9 +4,13 @@ import random
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
+from attacks.base import FLOOD_BASE, AttackContext
+from attacks.byzantine import ByzantineAttack
+from attacks.churn import ChurnAttack
+from attacks.flooding import PeerFloodingAttack
+from attacks.poisoning import PeerPoisoningAttack
+from attacks.selective import SelectiveForwardingAttack
 from core.node import Node
-
-FLOOD_BASE = 10_000
 
 
 @dataclass
@@ -28,12 +32,26 @@ class AttackParams:
     eclipse_targets: int = 0 # 0 = napad je „širok" (svi cvorovi); >0 = ciljani Eclipse na N zrtava
 
 
+# 5.1.6: redosled modula je fiksan zbog determinizma — poisoning pre flooding-a,
+# selective pre byzantine (jer selektivno cutanje ima prednost nad profilom).
+DEFAULT_MODULES = (
+    ChurnAttack(),
+    PeerPoisoningAttack(),
+    PeerFloodingAttack(),
+    SelectiveForwardingAttack(),
+    ByzantineAttack(),
+)
+
+
 @dataclass
 class Scenario:
+    # Scenario je koordinator: drzi ucesnike i parametre, a same napade
+    # izvrsavaju nezavisni moduli (attacks/*.py) iza zajednickog interfejsa
     honest_ids: Set[int]
     byzantine_ids: Set[int]
     sybil_ids: Set[int]
     params: AttackParams = field(default_factory=AttackParams)
+    modules: tuple = DEFAULT_MODULES
 
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
@@ -44,77 +62,51 @@ class Scenario:
     def malicious_ids(self) -> Set[int]:
         return self.byzantine_ids | self.sybil_ids
 
+    @property
+    def ctx(self) -> AttackContext:
+        return AttackContext(self.honest_ids, self.byzantine_ids, self.sybil_ids, self.params)
+
+    def active_modules(self) -> List:
+        # nezavisno ukljucivanje: modul ucestvuje samo ako je ukljucen parametrima
+        ctx = self.ctx
+        return [m for m in self.modules if m.enabled(ctx)]
+
     def active(self, round_now: int) -> bool:
         return round_now >= self.params.activate_round
+
+    def targets(self) -> List[int]:
+        return self.ctx.targets()
 
     def responds(self, identity: int, round_now: int, rng: random.Random) -> bool:
         if not self.active(round_now) or identity not in self.malicious_ids:
             return True
-        if self.params.unresponsive_p <= 0.0:
-            return True
-        r = random.Random(hash((identity, round_now, "resp")))
-        return r.random() >= self.params.unresponsive_p
+        ctx = self.ctx
+        for module in self.active_modules():
+            decision = module.responds(ctx, identity, round_now)
+            if decision is not None:
+                return decision
+        return True
 
     def broadcast_value(self, identity: int, honest_value: float, round_now: int) -> float:
         if not self.active(round_now) or identity not in self.malicious_ids:
             return honest_value
-        p = self.params
-        if p.selective_p < 1.0:
-            r = random.Random(hash((identity, round_now, "sel")))
-            if r.random() > p.selective_p:
-                return p.x_star
-        prof = p.byzantine_profile
-        if prof == "extreme":
-            return p.x_star + p.extreme_offset
-        if prof == "random":
-            r = random.Random(hash((identity, round_now, "rnd")))
-            return r.uniform(p.random_low, p.random_high)
-        if prof == "low_biased":
-            return p.x_star + p.low_bias
-        if prof == "stale":
-            return p.stale_value
-        return p.coordinated_value
-
-    def targets(self) -> List[int]:
-        # ECLIPSE: napadac bira N zrtava (najmanji id-jevi, deterministicki)
-        # i sve svoje identitete koncentrise na njih umesto da se rasipa po celoj mrezi
-        k = self.params.eclipse_targets
-        if k <= 0:
-            return []
-        return sorted(self.honest_ids)[:k]
+        ctx = self.ctx
+        for module in self.active_modules():
+            value = module.broadcast_value(ctx, identity, honest_value, round_now)
+            if value is not None:
+                return value
+        return honest_value
 
     def offer_candidates(self, node: Node, round_now: int, rng: random.Random) -> List[int]:
         if not self.active(round_now):
             return []
-        # POISONING!!!!!!!!!!!!!!!!!
-        # za svaki honest čvor, u listu kandidata se stave svi napadači (koji već nisu njegove komšije)
-        # to modeluje situaciju gde napadač (ili kompromitovan peer) preporučuje druge napadače
-        targets = self.targets()
-        # kod ciljanog Eclipse napada napadacki identiteti se nude iskljucivo zrtvama;
-        # ostali honest cvorovi ne dobijaju nijednog napadaca u ponudi
-        if targets and node.node_id not in targets:
-            offers = []
-        else:
-            offers = [m for m in sorted(self.malicious_ids) if m not in node.peers]
-        # u pravom sistemu čvor bi otkrivao i honest i napadačke kandidate, ne samo napadače
-        # ovo je „šum" da poisoning ne bude previše očigledan (da nije samo napadači u ponudi)
-        honest_pool = [
-            h for h in sorted(self.honest_ids)
-            if h != node.node_id and h not in node.peers
-        ]
-        rng.shuffle(honest_pool)
-        offers.extend(honest_pool[: self.params.poison_honest_offers])
-        if self.params.flooding > 0: # FLOODING!!!!!!!!!!!!!!!!!
-            offers.extend(FLOOD_BASE + i for i in range(self.params.flooding))
+        ctx = self.ctx
+        offers: List[int] = []
+        for module in self.active_modules():
+            offers = module.offer_candidates(ctx, node, round_now, rng, offers)
         return offers
 
     def churn_reset(self, nodes: Dict[int, Node], round_now: int) -> None:
-        p = self.params
-        if p.churn_period <= 0 or round_now == 0 or round_now % p.churn_period != 0:
-            return
-        for node in nodes.values():
-            for mid in self.malicious_ids:
-                obs = node.observations.get(mid)
-                if obs is not None:
-                    obs.first_seen_round = round_now
-                    obs.successful_exchanges = 0
+        ctx = self.ctx
+        for module in self.active_modules():
+            module.before_round(ctx, nodes, round_now)
