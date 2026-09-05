@@ -85,6 +85,7 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
             obs = node.observations.get(p)
             if obs is not None:
                 obs.missed_heartbeats += 1
+                obs.missed_total += 1
     # timeout eviction: peer koji predugo cuti se izbacuje iz peer set-a
     timeouts = 0
     if timeout_rounds > 0:
@@ -92,6 +93,7 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
             obs = node.observations.get(p)
             if obs is not None and obs.missed_heartbeats > timeout_rounds:
                 node.peers.remove(p)
+                obs.timeout_count += 1
                 timeouts += 1
                 if trace is not None:
                     trace.evict(round_now, node.node_id, p, "timeout", None)

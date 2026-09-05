@@ -36,8 +36,10 @@ class SybilResistantStrategy:
         obs = node.observations.get(candidate)
         first_seen = round_now if obs is None else obs.first_seen_round
         exchanges = 0 if obs is None else obs.successful_exchanges
+        missed = 0 if obs is None else obs.missed_total
         return identity_score(round_now, first_seen, exchanges, self.pow_valid(candidate),
-                              self.params.age_max, self.params.exchange_max)
+                              self.params.age_max, self.params.exchange_max,
+                              missed_total=missed)
 
     def reason(self, node: Node, candidate: int, round_now: int) -> Optional[str]:
         if candidate == node.node_id or candidate in node.peers:
