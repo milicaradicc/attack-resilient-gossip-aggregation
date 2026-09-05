@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from core.rng import make_rng
 from core.setup import build_world
 from core.config import load_defaults, spec_from
+from metrics.event_trace import EventTrace
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
 
@@ -19,6 +20,14 @@ class _Stub:
     def __init__(self, peers, estimate):
         self.peers = list(peers) # kopija liste
         self.estimate = estimate # procena
+
+
+def _row_to_event(row):
+    # red iz izvestaja cvora nazad u dogadjaj (redosled polja: TRACE_FIELDS)
+    from metrics.event_trace import TraceEvent
+    return TraceEvent(row[0], row[1], row[2],
+                      None if row[3] == "" else row[3],
+                      row[4], None if row[5] == "" else row[5])
 
 
 class _OfferView:
@@ -68,6 +77,7 @@ class ControllerState:
         self.metrics = ExperimentMetrics(x_star=self.x_star,
                                          num_buckets=world.id_params.num_buckets,
                                          per_node=spec.per_node_metrics)
+        self.trace = EventTrace() if spec.trace_events else None
         self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
         self.lock = threading.Lock()
 
@@ -77,6 +87,7 @@ class ControllerState:
             "strategy": self.strategy_name, "aggregation": self.aggregation_name,
             "trim_alpha": self.trim_alpha, "timeout_rounds": self.timeout_rounds,
             "peer_set_size": self.cfg.peer_set_size,
+            "trace_events": self.spec.trace_events,
             "honest": sorted(self.honest), "byzantine": sorted(self.byzantine),
             "sybil": sorted(self.sybil), "x_star": self.x_star,
             "registry": {str(k): v for k, v in self.registry.nonces.items()},
@@ -132,6 +143,24 @@ class ControllerState:
             rej_invalid_pow=agg("rej_invalid_pow"), rej_too_young=agg("rej_too_young"),
             rej_low_score=agg("rej_low_score"), rej_bucket_full=agg("rej_bucket_full"),
             timeouts=agg("timeouts"))
+        if self.trace is not None:
+            # aktivacija napada je dogadjaj sistema, belezi je controller jednom
+            if r == self.scenario.params.activate_round:
+                self.trace.attack_activated(r, len(self.scenario.malicious_ids))
+            cp = self.scenario.params.churn_period
+            if cp > 0 and r % cp == 0:
+                self.trace.churn_reset(r, len(self.scenario.malicious_ids))
+            # napadacke emisije zna controller (njemu stizu), pa ih on i belezi
+            if self.scenario.active(r):
+                sent = self.broadcasts.get(r, {})
+                for m in sorted(self.scenario.malicious_ids):
+                    if m in sent:
+                        self.trace.malicious_broadcast(
+                            r, m, sent[m], self.scenario.params.byzantine_profile)
+            # dogadjaji stizu od cvorova; redosled je po id-u radi determinizma
+            for i in range(self.n):
+                for row in (rep[i].get("trace") or []):
+                    self.trace.events.append(_row_to_event(row))
         m = self.metrics.record(r, self.stubs, self.scenario, counters)
         self.recorded.add(r)
         if self.verbose:

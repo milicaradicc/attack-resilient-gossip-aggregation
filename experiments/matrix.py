@@ -11,6 +11,7 @@ from core.rng import make_rng
 from core.config import RunSpec, load_matrix
 from core.engine import Engine
 from core.setup import build_world
+from metrics.event_trace import TRACE_FIELDS, EventTrace
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS, ExperimentMetrics
 from sampling import get_strategy
 
@@ -34,7 +35,7 @@ SUMMARY_FIELDS = [
 # 6.3.6 peer diversity
 
 
-def run_single(spec: RunSpec) -> ExperimentMetrics:
+def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
     # svet (cvorovi, identiteti, PoW registar, scenario) sklapa se u core/setup.py,
     # istom funkcijom koju koristi i distribuirani controller
     world = build_world(spec)
@@ -47,7 +48,7 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
 
     engine = Engine(world.nodes, aggregation, sampling, world.scenario, spec.num_rounds,
-                    metrics, rng, timeout_rounds=spec.timeout_rounds)
+                    metrics, rng, timeout_rounds=spec.timeout_rounds, trace=trace)
     engine.run()
     return metrics
 
@@ -81,6 +82,13 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
     w_node = csv.writer(f_node) if f_node else None
     if w_node:
         w_node.writerow(CONFIG_FIELDS + NODE_FIELDS)
+    # 5.1.8: zapis dogadjaja (admission odluke, promene peer set-a, aktivacija napada)
+    trace_path = out_path.replace(".csv", "_trace.csv") if any(
+        sp.trace_events for sp in specs) else None
+    f_trace = open(trace_path, "w", newline="") if trace_path else None
+    w_trace = csv.writer(f_trace) if f_trace else None
+    if w_trace:
+        w_trace.writerow(CONFIG_FIELDS + TRACE_FIELDS)
     with open(out_path, "w", newline="") as f_round, open(summary_path, "w", newline="") as f_sum:
         w_round = csv.writer(f_round)
         w_sum = csv.writer(f_sum)
@@ -88,7 +96,8 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
         w_sum.writerow(CONFIG_FIELDS + SUMMARY_FIELDS)
         prefix = lambda s: [s.n_honest, s.beta, s.overlay, s.aggregation, s.byzantine_profile, s.seed]
         for i, spec in enumerate(specs, 1):
-            metrics = run_single(spec)
+            trace = EventTrace() if spec.trace_events else None
+            metrics = run_single(spec, trace=trace)
             rows = metrics.to_csv_rows()
             for row in rows:
                 w_round.writerow(prefix(spec) + row)
@@ -102,10 +111,15 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
             if w_node:
                 for row in metrics.node_csv_rows():
                     w_node.writerow(prefix(spec) + row)
+            if w_trace and trace is not None:
+                for row in trace.csv_rows():
+                    w_trace.writerow(prefix(spec) + row)
             print(f"[{i}/{len(specs)}] nh={spec.n_honest} beta={spec.beta} "
                   f"{spec.overlay} {spec.aggregation} seed={spec.seed}")
     if f_node:
         f_node.close()
+    if f_trace:
+        f_trace.close()
     if json_path:
         with open(json_path, "w") as f:
             json.dump({"runs": json_runs}, f)

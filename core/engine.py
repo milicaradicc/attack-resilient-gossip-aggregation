@@ -9,7 +9,7 @@ class Engine:
     # podacima iz memorije; distribuirana verzija (docker/node_service.py) hrani
     # iste te funkcije podacima preko HTTP-a
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
-                 timeout_rounds: int = 0):
+                 timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
         self.aggregation = aggregation
         self.sampling = sampling
@@ -18,6 +18,7 @@ class Engine:
         self.metrics = metrics
         self.rng = rng
         self.timeout_rounds = timeout_rounds
+        self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
     def _discover(self, round_now):
         offered = 0
@@ -25,18 +26,20 @@ class Engine:
         for node in self.nodes.values():
             # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
-            n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling, round_now)
+            n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
+                                                     round_now, trace=self.trace)
             offered += n_off
             for k, v in node_reasons.items():
                 reasons[k] += v
         return offered, sum(reasons.values()), reasons
 
     def _broadcast(self, round_now):
-        return round_ops.broadcast_snapshot(self.nodes, self.scenario, round_now)
+        return round_ops.broadcast_snapshot(self.nodes, self.scenario, round_now,
+                                           trace=self.trace)
 
     def _heartbeat(self, node, peers, round_now):
         return round_ops.heartbeat(node, peers, self.scenario, round_now,
-                                   self.rng, self.timeout_rounds)
+                                   self.rng, self.timeout_rounds, trace=self.trace)
 
     def run(self):
         # sacuvaj prvu rundu
@@ -45,6 +48,11 @@ class Engine:
         for r in range(1, self.num_rounds + 1):
             # churn
             self.scenario.churn_reset(self.nodes, r)
+            if (self.trace is not None and self.scenario.params.churn_period > 0
+                    and r > 0 and r % self.scenario.params.churn_period == 0):
+                self.trace.churn_reset(r, len(self.scenario.malicious_ids))
+            if self.trace is not None and r == self.scenario.params.activate_round:
+                self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             # discover + admission
             offered, rejected, reasons = self._discover(r)
             # na pocetku runce snimak
@@ -60,6 +68,8 @@ class Engine:
                 received = [broadcast[p] for p in responders] # pokupi vrednosti onih koji su odgovorili
                 data_msgs += len(received)
                 node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
+                if self.trace is not None:
+                    self.trace.estimate(r, hid, node.estimate)
 
             counters = RoundCounters(
                 data_msgs=data_msgs, control_msgs=offered + rejected,

@@ -9,6 +9,7 @@ import urllib.request
 from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
 from core import round_ops
+from metrics.event_trace import EventTrace
 from core.node import Node
 from identity.observation import Observation
 from identity.registry import IdentityParams, IdentityRegistry
@@ -100,8 +101,10 @@ def run_honest(base, node_id, cfg, job=None):
         opath = f"{base}/offers/{node_id}/{r}" if job is None else f"{base}/offers/{job}/{node_id}/{r}"
         offers = _block_get(opath)["offers"]
 
+        # 5.1.8: dogadjaji nastaju lokalno na cvoru, pa se salju controlleru u izvestaju
+        trace = EventTrace() if cfg.get("trace_events") else None
         # ista admission logika koju koristi i in-process Engine
-        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r)
+        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r, trace=trace)
 
         own = node.estimate
         _block_post(f"{base}/broadcast", _tag(
@@ -111,16 +114,19 @@ def run_honest(base, node_id, cfg, job=None):
 
         # isti heartbeat/timeout mehanizam kao in-process
         responders, timeouts = round_ops.heartbeat(
-            node, list(node.peers), scenario, r, None, timeout_rounds)
+            node, list(node.peers), scenario, r, None, timeout_rounds, trace=trace)
         received = [vals[str(p)] for p in responders if str(p) in vals]
         node.estimate = aggregation.aggregate(own, received)
+        if trace is not None:
+            trace.estimate(r, node_id, node.estimate)
 
         _block_post(f"{base}/report", _tag({
             "node_id": node_id, "round": r, "peers": node.peers, "estimate": node.estimate,
             "offered": offered, "rejected": rejected, "data_msgs": len(received),
             "rej_invalid_pow": reasons["invalid_pow"], "rej_too_young": reasons["too_young"],
             "rej_low_score": reasons["low_score"], "rej_bucket_full": reasons["bucket_full"],
-            "timeouts": timeouts}, job))
+            "timeouts": timeouts,
+            "trace": trace.csv_rows() if trace is not None else None}, job))
 
 
 def run_malicious(base, node_id, cfg, job=None):

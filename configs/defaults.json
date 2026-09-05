@@ -47,6 +47,7 @@
   "epsilon": 0.05,
   "conv_window_start": 20,
   "per_node_metrics": true,
+  "trace_events": true,
   "docker_port": 8000,
   "docker_compose_out": "docker/docker-compose.yml"
 }

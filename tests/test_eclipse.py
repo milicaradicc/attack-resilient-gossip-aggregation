@@ -51,8 +51,11 @@ def test_per_node_metrics_recorded():
     assert victim[0].honest_peers > 0 and victim[-1].honest_peers == 0
 
 
-def test_per_node_off_by_default():
-    m = run_single(_spec("random"))
+def test_per_node_can_be_disabled():
+    # zapis po cvoru se moze iskljuciti (npr. za brze provere)
+    spec = _spec("random")
+    spec.per_node_metrics = False
+    m = run_single(spec)
     assert m.node_rows == []
 
 
@@ -62,5 +65,5 @@ if __name__ == "__main__":
     test_targeted_eclipse_succeeds_without_defense()
     test_bucket_defense_prevents_targeted_eclipse()
     test_per_node_metrics_recorded()
-    test_per_node_off_by_default()
+    test_per_node_can_be_disabled()
     print("OK — ciljani Eclipse napad uspeva bez zastite, odbrana ga zaustavlja")

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
+from attacks.scenario import FLOOD_BASE
 from identity.observation import Observation
 
 # Zajednicka per-cvor logika jedne gossip runde.
@@ -31,10 +32,15 @@ def observe(node, other: int, round_now: int, exchanged: bool) -> None:
             obs.missed_heartbeats = 0
 
 
-def admit(node, offered: List[int], sampling, round_now: int) -> Tuple[int, int, Dict[str, int]]:
+def admit(node, offered: List[int], sampling, round_now: int,
+          trace=None) -> Tuple[int, int, Dict[str, int]]:
     # discovery + admission + eviction za JEDAN cvor
     # 'offered' su vec pribavljeni kandidati (Engine ih racuna, node ih dobija preko HTTP-a)
     reasons = empty_reasons()
+    if trace is not None:
+        flooded = sum(1 for c in offered if c >= FLOOD_BASE)
+        if flooded:
+            trace.flooding(round_now, node.node_id, flooded)
     for candidate in offered:
         # zabelezi u dnevnik (vidjanje, ne razmena) -> time mu starost pocinje da tece
         observe(node, candidate, round_now, exchanged=False)
@@ -49,18 +55,26 @@ def admit(node, offered: List[int], sampling, round_now: int) -> Tuple[int, int,
             victim = sampling.evict_peer(node, round_now, candidate)
             if victim is not None:
                 node.peers.remove(victim)
+                if trace is not None:
+                    trace.evict(round_now, node.node_id, victim, "replaced_by", candidate)
             elif len(node.peers) >= sampling.max_peers:
+                if trace is not None:
+                    trace.reject(round_now, node.node_id, candidate, "peer_set_full")
                 continue
             node.peers.append(candidate)
+            if trace is not None:
+                trace.accept(round_now, node.node_id, candidate)
         else:
             # povecaj brojace
             why = sampling.reason(node, candidate, round_now) or "self_or_duplicate"
             reasons[why] = reasons.get(why, 0) + 1
+            if trace is not None:
+                trace.reject(round_now, node.node_id, candidate, why)
     return len(offered), sum(reasons.values()), reasons
 
 
 def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
-              timeout_rounds: int) -> Tuple[List[int], int]:
+              timeout_rounds: int, trace=None) -> Tuple[List[int], int]:
     # ko odgovara ostaje u razmeni, ko cuti skuplja propustene otkucaje
     responders = []
     for p in peers:
@@ -79,12 +93,15 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
             if obs is not None and obs.missed_heartbeats > timeout_rounds:
                 node.peers.remove(p)
                 timeouts += 1
+                if trace is not None:
+                    trace.evict(round_now, node.node_id, p, "timeout", None)
                 if p in responders:
                     responders.remove(p)
     return responders, timeouts
 
 
-def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int) -> Dict[int, float]:
+def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int,
+                       trace=None) -> Dict[int, float]:
     # snapshot svih cvorova i malicijusa (koristi ga samo in-process putanja;
     # u distribuiranoj verziji istu ulogu ima barijera na controlleru)
     out = {}
@@ -93,4 +110,6 @@ def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int) -> Di
     for m in scenario.malicious_ids:
         # vrati placeholder svakako se ne koristi ta vrednost
         out[m] = scenario.broadcast_value(m, 0.0, round_now)
+        if trace is not None and scenario.active(round_now):
+            trace.malicious_broadcast(round_now, m, out[m], scenario.params.byzantine_profile)
     return out

@@ -11,6 +11,7 @@ from docker.controller_service import ControllerState, _Server
 from core.rng import make_rng
 from core.config import RunSpec, load_matrix
 from experiments.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, summarize
+from metrics.event_trace import TRACE_FIELDS
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS
 
 
@@ -29,6 +30,7 @@ class MatrixState:
         self.summaries = {}
         self.round_rows = {}
         self.node_rows = {}
+        self.trace_rows = {}
         self.lock = threading.Lock()
         self.max_nodes = max(s.n_honest + sum(s.malicious_counts()) for s in self.specs)
 
@@ -65,6 +67,8 @@ class MatrixState:
         self.round_rows[job] = (prefix, st.metrics.to_csv_rows())
         if st.metrics.per_node:
             self.node_rows[job] = (prefix, st.metrics.node_csv_rows())
+        if st.trace is not None:
+            self.trace_rows[job] = (prefix, st.trace.csv_rows())
         if self.verbose:
             last = st.metrics.rows[-1]
             print(f"[{job + 1}/{len(self.specs)}] nh={spec.n_honest} beta={spec.beta} "
@@ -101,6 +105,15 @@ class MatrixState:
         with open(json_path, "w") as f:
             json.dump({"runs": runs}, f)
         # per-node zapis (4.9) samo ako je trazen u konfiguraciji
+        if self.trace_rows:
+            trace_path = out_path.replace(".csv", "_trace.csv")
+            with open(trace_path, "w", newline="") as f_trace:
+                w_trace = csv.writer(f_trace)
+                w_trace.writerow(CONFIG_FIELDS + TRACE_FIELDS)
+                for j in sorted(self.trace_rows):
+                    prefix, rows = self.trace_rows[j]
+                    for row in rows:
+                        w_trace.writerow(prefix + row)
         if self.node_rows:
             node_path = out_path.replace(".csv", "_nodes.csv")
             with open(node_path, "w", newline="") as f_node:
