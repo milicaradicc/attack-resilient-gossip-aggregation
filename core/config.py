@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+
+from core.setup import malicious_counts as core_malicious_counts
 from typing import Any, Dict, List, Tuple
 
 from core.setup import malicious_counts as core_malicious_counts

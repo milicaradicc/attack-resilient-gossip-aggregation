@@ -82,6 +82,90 @@ identican trag — i in-process i u kontejnerima.
 ---
 
 ## 2. Pokretanje
+# Gossip Overlay — otporna distribuirana agregacija
+
+Gossip overlay sistem za distribuiranu agregaciju koji zadrzava tacnost procene
+u prisustvu kombinovanih napada na tri sloja: identitet (Sybil), strukturu veza
+(Eclipse, peer poisoning, flooding, churn) i same vrednosti (Byzantine).
+
+Svaki cvor poseduje lokalnu vrednost i ogranicen peer set. Kroz gossip razmene
+sa komsijama svi honest cvorovi treba da procene globalnu srednju vrednost
+`x* = mean(x_i)`. Cilj sistema je da za udeo zlonamernih `beta <= 0.30` odrzi
+relativnu gresku `err_rel <= 0.05` uz ogranicenu Sybil penetraciju i stabilnu
+overlay strukturu.
+
+---
+
+## 1. Arhitektura
+
+Sistem je organizovan kao **biblioteka + dva pokretaca**. Biblioteka sadrzi svu
+logiku i ne zna nista o tome kako se pokrece. Iznad nje stoje dva nezavisna
+pokretaca koji istu logiku izvrsavaju na dva nacina.
+
+```
+              BIBLIOTEKA (logika sistema)
+   core, identity, sampling, aggregation, attacks, metrics
+                         |
+          +--------------+--------------+
+          |                             |
+    experiments/                    docker/
+   (in-process, brzo)        (kontejner po cvoru, distribuirano)
+```
+
+Nijedan pokretac ne sadrzi logiku — oni je samo hrane podacima. In-process je
+hrani iz memorije, distribuirani preko HTTP-a. Zato oba daju **bit-identicne**
+rezultate, sto je pokriveno testovima koji porede obe putanje.
+
+### Slojevi biblioteke
+
+| Sloj | Odgovornost |
+|---|---|
+| `core/` | model i motor: cvor, overlay topologija, deterministicki rng, sklapanje sveta, motor runde, zajednicka per-cvor logika |
+| `identity/` | sloj identiteta: proof-of-work, bucket mapiranje, identity scoring, observation log |
+| `sampling/` | tri zamenljive peer sampling strategije iza istog interfejsa |
+| `aggregation/` | tri zamenljive agregacione funkcije |
+| `attacks/` | katalog napada kao parametrizovani profili |
+| `metrics/` | merenje: greska, penetracija, diversity, overhead, razlozi odbijanja |
+
+Zavisnosti idu strogo u jednom smeru — `core` ne zna ni za koga, a napadi i
+metrike sede iznad. Strategije i agregacije su iza protokola, pa se menjaju bez
+diranja ostatka sistema. To je ono sto omogucava eksperiment: menja se jedna
+komponenta, sve ostalo ostaje isto.
+
+### Jedna gossip runda
+
+1. **churn** — ako je aktivan, resetuje starost napadackih identiteta
+2. **discovery + admission** — scenario nudi kandidate, strategija odlucuje ko
+   ulazi u peer set (PoW / starost / skor / bucket) i koga izbacuje
+3. **broadcast** — snimak svih emitovanih vrednosti (honest prave, napadaci lazne)
+4. **heartbeat** — ko ne odgovara skuplja propustene otkucaje i posle
+   `timeout_rounds` biva izbacen
+5. **agregacija** — nova procena iz sopstvene vrednosti i vrednosti onih koji su
+   odgovorili
+6. **metrike** — belezenje stanja runde
+
+Vrednosti se zamrznu na pocetku runde i tek onda citaju, pa rezultat ne zavisi
+od redosleda obrade (sinhroni tick-barrier model).
+
+### Deljena per-cvor logika
+
+`core/round_ops.py` sadrzi korake runde koji se izvrsavaju nad jednim cvorom
+(`observe`, `admit`, `heartbeat`). Funkcije primaju vec pribavljene podatke, pa
+ih `core/engine.py` poziva sa podacima iz memorije a `docker/node_service.py` sa
+podacima iz mreze. Admission i heartbeat pravila zato postoje samo na jednom
+mestu i ne mogu da se raziju izmedju dve putanje.
+
+### Deterministicka reproduktivnost
+
+Sva slucajnost se izvodi iz jednog eksperimentalnog seed-a formulom
+`seed = SHA256(exp_seed || component_name)`, sa zasebnim generatorom po
+podsistemu (pocetne vrednosti, topologija, peer selection, Byzantine vrednosti,
+heartbeat). Nigde se ne koristi globalni generator. Isti eksperiment uvek daje
+identican trag — i in-process i u kontejnerima.
+
+---
+
+## 2. Pokretanje
 
 Jezgro nema zavisnosti (Python 3.10+). Analiza koristi matplotlib.
 
