@@ -64,6 +64,7 @@ class ControllerState:
         self.broadcasts = {}
         self.reports = {}
         self.recorded = {0} # runda 0 se belezi ispod, mora da udje da bi complete() bio tacan
+        self.recorded = {0} # runda 0 se belezi ispod, mora da udje da bi complete() bio tacan
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
         self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=world.id_params.num_buckets)
         self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
