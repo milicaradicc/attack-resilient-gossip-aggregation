@@ -138,7 +138,7 @@ class ControllerState:
             self.stubs[i].estimate = rep[i]["estimate"]
         agg = lambda key: sum(rep[i][key] for i in range(self.n))
         counters = RoundCounters(
-            data_msgs=agg("data_msgs"), control_msgs=agg("offered") + agg("rejected"),
+            data_msgs=agg("data_msgs"), control_msgs=agg("control_msgs"),
             offered=agg("offered"), rejected=agg("rejected"),
             rej_invalid_pow=agg("rej_invalid_pow"), rej_too_young=agg("rej_too_young"),
             rej_low_score=agg("rej_low_score"), rej_bucket_full=agg("rej_bucket_full"),

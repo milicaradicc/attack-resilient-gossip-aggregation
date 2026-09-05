@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from core import round_ops
+from core import messages, round_ops
 from metrics.experiment_metrics import RoundCounters
 
 
@@ -20,14 +20,15 @@ class Engine:
         self.timeout_rounds = timeout_rounds
         self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
-    def _discover(self, round_now):
+    def _discover(self, round_now, counter=None):
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
             # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
-                                                     round_now, trace=self.trace)
+                                                     round_now, trace=self.trace,
+                                                     counter=counter)
             offered += n_off
             for k, v in node_reasons.items():
                 reasons[k] += v
@@ -37,9 +38,10 @@ class Engine:
         return round_ops.broadcast_snapshot(self.nodes, self.scenario, round_now,
                                            trace=self.trace)
 
-    def _heartbeat(self, node, peers, round_now):
+    def _heartbeat(self, node, peers, round_now, counter=None):
         return round_ops.heartbeat(node, peers, self.scenario, round_now,
-                                   self.rng, self.timeout_rounds, trace=self.trace)
+                                   self.rng, self.timeout_rounds, trace=self.trace,
+                                   counter=counter)
 
     def run(self):
         # sacuvaj prvu rundu
@@ -54,7 +56,9 @@ class Engine:
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             # discover + admission
-            offered, rejected, reasons = self._discover(r)
+            # 5.1.5: poruke se broje po klasi, iz stvarno poslatih poruka
+            counter = messages.MessageCounter()
+            offered, rejected, reasons = self._discover(r, counter=counter)
             # na pocetku runce snimak
             broadcast = self._broadcast(r) # ovde su i napadaci, own samo honest
             own = {hid: n.estimate for hid, n in self.nodes.items()}
@@ -63,16 +67,18 @@ class Engine:
             timeouts = 0
             for hid, node in self.nodes.items():
                 peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
-                responders, t = self._heartbeat(node, peers, r)
+                responders, t = self._heartbeat(node, peers, r, counter=counter)
                 timeouts += t
-                received = [broadcast[p] for p in responders] # pokupi vrednosti onih koji su odgovorili
+                incoming = [broadcast[p] for p in responders] # data poruke onih koji su odgovorili
+                counter.add_all(incoming)
+                received = [m.payload for m in incoming]
                 data_msgs += len(received)
                 node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
                 if self.trace is not None:
                     self.trace.estimate(r, hid, node.estimate)
 
             counters = RoundCounters(
-                data_msgs=data_msgs, control_msgs=offered + rejected,
+                data_msgs=counter.data, control_msgs=counter.control,
                 offered=offered, rejected=rejected,
                 rej_invalid_pow=reasons["invalid_pow"], rej_too_young=reasons["too_young"],
                 rej_low_score=reasons["low_score"], rej_bucket_full=reasons["bucket_full"],

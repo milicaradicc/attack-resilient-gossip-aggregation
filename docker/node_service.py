@@ -8,7 +8,7 @@ import urllib.request
 
 from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
-from core import round_ops
+from core import messages, round_ops
 from metrics.event_trace import EventTrace
 from core.node import Node
 from identity.observation import Observation
@@ -103,8 +103,11 @@ def run_honest(base, node_id, cfg, job=None):
 
         # 5.1.8: dogadjaji nastaju lokalno na cvoru, pa se salju controlleru u izvestaju
         trace = EventTrace() if cfg.get("trace_events") else None
+        # 5.1.5: poruke se broje po klasi, isto kao u in-process putanji
+        counter = messages.MessageCounter()
         # ista admission logika koju koristi i in-process Engine
-        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r, trace=trace)
+        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r,
+                                                     trace=trace, counter=counter)
 
         own = node.estimate
         _block_post(f"{base}/broadcast", _tag(
@@ -114,15 +117,20 @@ def run_honest(base, node_id, cfg, job=None):
 
         # isti heartbeat/timeout mehanizam kao in-process
         responders, timeouts = round_ops.heartbeat(
-            node, list(node.peers), scenario, r, None, timeout_rounds, trace=trace)
+            node, list(node.peers), scenario, r, None, timeout_rounds, trace=trace,
+            counter=counter)
         received = [vals[str(p)] for p in responders if str(p) in vals]
+        for p in responders:
+            if str(p) in vals:
+                counter.add(messages.data(r, p, vals[str(p)]))
         node.estimate = aggregation.aggregate(own, received)
         if trace is not None:
             trace.estimate(r, node_id, node.estimate)
 
         _block_post(f"{base}/report", _tag({
             "node_id": node_id, "round": r, "peers": node.peers, "estimate": node.estimate,
-            "offered": offered, "rejected": rejected, "data_msgs": len(received),
+            "offered": offered, "rejected": rejected, "data_msgs": counter.data,
+            "control_msgs": counter.control,
             "rej_invalid_pow": reasons["invalid_pow"], "rej_too_young": reasons["too_young"],
             "rej_low_score": reasons["low_score"], "rej_bucket_full": reasons["bucket_full"],
             "timeouts": timeouts,

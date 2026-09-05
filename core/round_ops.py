@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from attacks.scenario import FLOOD_BASE
+from attacks.base import FLOOD_BASE
+from core import messages
 from identity.observation import Observation
 
 # Zajednicka per-cvor logika jedne gossip runde.
@@ -33,7 +34,7 @@ def observe(node, other: int, round_now: int, exchanged: bool) -> None:
 
 
 def admit(node, offered: List[int], sampling, round_now: int,
-          trace=None) -> Tuple[int, int, Dict[str, int]]:
+          trace=None, counter=None) -> Tuple[int, int, Dict[str, int]]:
     # discovery + admission + eviction za JEDAN cvor
     # 'offered' su vec pribavljeni kandidati (Engine ih racuna, node ih dobija preko HTTP-a)
     reasons = empty_reasons()
@@ -42,6 +43,10 @@ def admit(node, offered: List[int], sampling, round_now: int,
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
     for candidate in offered:
+        # 5.1.5: svaka ponuda kandidata je control poruka (peer exchange)
+        if counter is not None:
+            counter.add(messages.control(messages.PEER_EXCHANGE, round_now,
+                                         node.node_id, candidate))
         # zabelezi u dnevnik (vidjanje, ne razmena) -> time mu starost pocinje da tece
         observe(node, candidate, round_now, exchanged=False)
         # ako je kandidat vec komsija skip
@@ -62,22 +67,31 @@ def admit(node, offered: List[int], sampling, round_now: int,
                     trace.reject(round_now, node.node_id, candidate, "peer_set_full")
                 continue
             node.peers.append(candidate)
+            if counter is not None:
+                counter.add(messages.control(messages.ADMISSION, round_now,
+                                             node.node_id, candidate))
             if trace is not None:
                 trace.accept(round_now, node.node_id, candidate)
         else:
             # povecaj brojace
             why = sampling.reason(node, candidate, round_now) or "self_or_duplicate"
             reasons[why] = reasons.get(why, 0) + 1
+            if counter is not None:
+                counter.add(messages.control(messages.PEER_REJECT, round_now,
+                                             node.node_id, candidate, why))
             if trace is not None:
                 trace.reject(round_now, node.node_id, candidate, why)
     return len(offered), sum(reasons.values()), reasons
 
 
 def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
-              timeout_rounds: int, trace=None) -> Tuple[List[int], int]:
+              timeout_rounds: int, trace=None, counter=None) -> Tuple[List[int], int]:
     # ko odgovara ostaje u razmeni, ko cuti skuplja propustene otkucaje
     responders = []
     for p in peers:
+        # 5.1.5: heartbeat je control poruka
+        if counter is not None:
+            counter.add(messages.control(messages.HEARTBEAT, round_now, node.node_id, p))
         if scenario.responds(p, round_now, rng):
             observe(node, p, round_now, exchanged=True)
             responders.append(p)
@@ -103,15 +117,18 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
 
 
 def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int,
-                       trace=None) -> Dict[int, float]:
+                       trace=None) -> Dict[int, object]:
     # snapshot svih cvorova i malicijusa (koristi ga samo in-process putanja;
     # u distribuiranoj verziji istu ulogu ima barijera na controlleru)
     out = {}
     for hid, node in nodes.items():
-        out[hid] = scenario.broadcast_value(hid, node.estimate, round_now)
+        # 5.1.5: emitovana vrednost je data poruka (tip, runda, izvor, payload)
+        out[hid] = messages.data(round_now, hid,
+                                 scenario.broadcast_value(hid, node.estimate, round_now))
     for m in scenario.malicious_ids:
         # vrati placeholder svakako se ne koristi ta vrednost
-        out[m] = scenario.broadcast_value(m, 0.0, round_now)
+        out[m] = messages.data(round_now, m, scenario.broadcast_value(m, 0.0, round_now))
         if trace is not None and scenario.active(round_now):
-            trace.malicious_broadcast(round_now, m, out[m], scenario.params.byzantine_profile)
+            trace.malicious_broadcast(round_now, m, out[m].payload,
+                                      scenario.params.byzantine_profile)
     return out

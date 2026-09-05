@@ -46,11 +46,14 @@ def test_run_single_deterministic():
         assert ra.sybil_penetration == rb.sybil_penetration
 
 
-def test_benign_converges_and_no_overhead():
+def test_benign_converges_with_only_heartbeat_control():
+    # 5.1.5: u benignom slucaju nema discovery ni admission saobracaja,
+    # pa control poruke poticu iskljucivo od heartbeat provera
     m = run_single(_spec(0.0, overlay="random", aggregation="mean"))
     assert m.rows[-1].err_rel < 1e-2
     assert m.convergence_time(0.05) >= 1
-    assert m.control_overhead(8) == 0.0
+    assert all(r.offered == 0 and r.rejected == 0 for r in m.rows)
+    assert m.control_overhead(8) > 0.0
     assert m.data_overhead(8) > 0.0
 
 
