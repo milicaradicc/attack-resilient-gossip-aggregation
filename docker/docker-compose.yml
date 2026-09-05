@@ -6,8 +6,7 @@ services:
     environment:
       ROLE: "controller"
       MODE: "matrix"
-      MATRIX_CONFIG: "configs/main.json"
-      MATRIX_OUT: "results/distributed_matrix.csv"
+      MATRIX_CONFIG: "configs/smoke.json"
       N_HONEST: "10"
       BETA: "0.0"
       ROUNDS: "50"
@@ -30,7 +29,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./results:/app/results
+      - ../results:/app/results
   node0:
     build:
       context: ..
@@ -181,171 +180,6 @@ services:
     environment:
       ROLE: node
       NODE_ID: "13"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node14:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "14"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node15:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "15"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node16:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "16"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node17:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "17"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node18:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "18"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node19:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "19"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node20:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "20"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node21:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "21"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node22:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "22"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node23:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "23"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node24:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "24"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node25:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "25"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node26:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "26"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node27:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "27"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node28:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "28"
       MODE: matrix
       CONTROLLER_URL: http://controller:8000
     depends_on:

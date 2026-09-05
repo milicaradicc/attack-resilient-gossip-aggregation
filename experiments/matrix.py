@@ -11,7 +11,7 @@ from core.rng import make_rng
 from core.config import RunSpec, load_matrix
 from core.engine import Engine
 from core.setup import build_world
-from metrics.experiment_metrics import FIELDS, ExperimentMetrics
+from metrics.experiment_metrics import FIELDS, NODE_FIELDS, ExperimentMetrics
 from sampling import get_strategy
 
 CONFIG_FIELDS = ["n_honest", "beta", "overlay", "aggregation", "byzantine_profile", "seed"]
@@ -39,7 +39,8 @@ def run_single(spec: RunSpec) -> ExperimentMetrics:
     # istom funkcijom koju koristi i distribuirani controller
     world = build_world(spec)
 
-    metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
+    metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets,
+                                per_node=spec.per_node_metrics)
     sampling = get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
@@ -72,6 +73,14 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
     specs = load_matrix(config_path)
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     json_runs = []
+    # per-node zapis (4.9) se pise samo kada je trazen u konfiguraciji,
+    # jer nad punom matricom daje red velicine milion redova
+    node_path = out_path.replace(".csv", "_nodes.csv") if any(
+        sp.per_node_metrics for sp in specs) else None
+    f_node = open(node_path, "w", newline="") if node_path else None
+    w_node = csv.writer(f_node) if f_node else None
+    if w_node:
+        w_node.writerow(CONFIG_FIELDS + NODE_FIELDS)
     with open(out_path, "w", newline="") as f_round, open(summary_path, "w", newline="") as f_sum:
         w_round = csv.writer(f_round)
         w_sum = csv.writer(f_sum)
@@ -90,8 +99,13 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
                 "summary": dict(zip(SUMMARY_FIELDS, summary)),
                 "rounds": [dict(zip(FIELDS, row)) for row in rows],
             })
+            if w_node:
+                for row in metrics.node_csv_rows():
+                    w_node.writerow(prefix(spec) + row)
             print(f"[{i}/{len(specs)}] nh={spec.n_honest} beta={spec.beta} "
                   f"{spec.overlay} {spec.aggregation} seed={spec.seed}")
+    if f_node:
+        f_node.close()
     if json_path:
         with open(json_path, "w") as f:
             json.dump({"runs": json_runs}, f)

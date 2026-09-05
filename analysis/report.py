@@ -175,6 +175,28 @@ def fig_rejection_reasons(summary, beta, out_dir):
     plt.close(fig)
 
 
+def fig_victim_neighborhood(node_rows, beta, out_dir):
+    # 7.4: kako izgleda komsiluk ciljane zrtve kroz vreme (per-node podaci, 4.9)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for overlay in OVERLAYS:
+        sel = [r for r in node_rows
+               if r["overlay"] == overlay and r["node_id"] == 0
+               and r["beta"] == beta and r["seed"] == 1]
+        if not sel:
+            continue
+        sel.sort(key=lambda r: r["round"])
+        ax.plot([r["round"] for r in sel],
+                [r["honest_peers"] for r in sel], label=overlay)
+    ax.set_xlabel("runda")
+    ax.set_ylabel("broj honest suseda zrtve")
+    ax.set_title(f"Komsiluk ciljane zrtve tokom napada (beta={beta})")
+    ax.axhline(0, linestyle="--", linewidth=0.8)
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "victim_neighborhood.png"), dpi=130)
+    plt.close(fig)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     # podrazumevano se izvestaj pravi iz rezultata dobijenih u Docker okruzenju;
@@ -183,6 +205,7 @@ def main() -> None:
     parser.add_argument("--round", default=None)
     parser.add_argument("--summary", default=None)
     parser.add_argument("--ablation", default=None)
+    parser.add_argument("--nodes", default=None)
     parser.add_argument("--figures", default="figures")
     parser.add_argument("--tables", default=None)
     parser.add_argument("--beta", type=float, default=0.3)
@@ -192,6 +215,7 @@ def main() -> None:
     args.summary = args.summary or os.path.join(base, "main_summary.csv")
     args.ablation = args.ablation or os.path.join(base, "ablation_summary.csv")
     args.tables = args.tables or os.path.join(base, "tables.md")
+    args.nodes = args.nodes or os.path.join(base, "eclipse_nodes.csv")
     if not os.path.exists(args.summary):
         raise SystemExit(
             f"nema rezultata: {args.summary}\n"
@@ -215,6 +239,8 @@ def main() -> None:
     if os.path.exists(args.ablation):
         fig_profiles(load(args.ablation), args.figures)
 
+    if os.path.exists(args.nodes):
+        fig_victim_neighborhood(load(args.nodes), 0.4, args.figures)
     print(f"tables -> {args.tables}")
     print(f"figures -> {args.figures}/")
 

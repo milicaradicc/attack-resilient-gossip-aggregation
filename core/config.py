@@ -3,8 +3,6 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-
-from core.setup import malicious_counts as core_malicious_counts
 from typing import Any, Dict, List, Tuple
 
 from core.setup import malicious_counts as core_malicious_counts
@@ -52,6 +50,7 @@ class RunSpec:
     low_bias: float = 5.0
     stale_value: float = 130.0
     eclipse_targets: int = 0
+    per_node_metrics: bool = False
 
     def malicious_counts(self) -> Tuple[int, int]:
         return core_malicious_counts(self.n_honest, self.beta, self.byzantine_fraction)
@@ -104,6 +103,7 @@ def _spec_fields(c, override=None):
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
         stale_value=c["stale_value"], eclipse_targets=c["eclipse_targets"],
+        per_node_metrics=c["per_node_metrics"],
     )
 
 

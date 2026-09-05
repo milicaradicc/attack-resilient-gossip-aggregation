@@ -29,6 +29,27 @@ class RoundCounters:
     timeouts: int = 0
 
 
+NODE_FIELDS = [
+    "round", "node_id", "estimate", "err_rel", "peer_count",
+    "sybil_share", "honest_peers", "eclipsed", "peer_diversity", "bucket_occupancy",
+]
+
+
+@dataclass
+class NodeMetrics:
+    # 4.9: metrike po cvoru (pored per-round i per-experiment nivoa)
+    round: int
+    node_id: int
+    estimate: float
+    err_rel: float
+    peer_count: int
+    sybil_share: float
+    honest_peers: int
+    eclipsed: int
+    peer_diversity: float
+    bucket_occupancy: float
+
+
 @dataclass
 class RoundMetrics:
     round: int
@@ -55,6 +76,8 @@ class ExperimentMetrics:
     x_star: float
     num_buckets: int
     rows: List[RoundMetrics] = field(default_factory=list)
+    per_node: bool = False
+    node_rows: List[NodeMetrics] = field(default_factory=list)
 
     def record(self, round_no, nodes, scenario, counters=None) -> RoundMetrics:
         c = counters or RoundCounters()
@@ -73,7 +96,28 @@ class ExperimentMetrics:
             c.rej_invalid_pow, c.rej_too_young, c.rej_low_score, c.rej_bucket_full, c.timeouts,
         )
         self.rows.append(rm)
+        if self.per_node:
+            self._record_nodes(round_no, nodes, scenario)
         return rm
+
+    def _record_nodes(self, round_no, nodes, scenario) -> None:
+        for node_id, node in sorted(nodes.items()):
+            honest_peers = sum(1 for p in node.peers if p in scenario.honest_ids)
+            err = (abs(node.estimate - self.x_star) / abs(self.x_star)
+                   if self.x_star else abs(node.estimate))
+            self.node_rows.append(NodeMetrics(
+                round=round_no, node_id=node_id, estimate=node.estimate, err_rel=err,
+                peer_count=len(node.peers),
+                sybil_share=self._sybil_share(node, scenario),
+                honest_peers=honest_peers,
+                eclipsed=0 if honest_peers else 1,
+                peer_diversity=self._diversity(node),
+                bucket_occupancy=self._bucket_occupancy(node)))
+
+    def node_csv_rows(self):
+        return [[r.round, r.node_id, r.estimate, r.err_rel, r.peer_count,
+                 r.sybil_share, r.honest_peers, r.eclipsed,
+                 r.peer_diversity, r.bucket_occupancy] for r in self.node_rows]
 
     def _sybil_share(self, node, scenario):
         if not node.peers:

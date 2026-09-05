@@ -46,6 +46,7 @@
   "eclipse_targets": 0,
   "epsilon": 0.05,
   "conv_window_start": 20,
+  "per_node_metrics": true,
   "docker_port": 8000,
   "docker_compose_out": "docker/docker-compose.yml"
 }
