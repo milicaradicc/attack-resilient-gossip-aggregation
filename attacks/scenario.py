@@ -25,6 +25,7 @@ class AttackParams:
     churn_period: int = 0
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
+    eclipse_targets: int = 0 # 0 = napad je „širok" (svi cvorovi); >0 = ciljani Eclipse na N zrtava
 
 
 @dataclass
@@ -74,13 +75,27 @@ class Scenario:
             return p.stale_value
         return p.coordinated_value
 
+    def targets(self) -> List[int]:
+        # ECLIPSE: napadac bira N zrtava (najmanji id-jevi, deterministicki)
+        # i sve svoje identitete koncentrise na njih umesto da se rasipa po celoj mrezi
+        k = self.params.eclipse_targets
+        if k <= 0:
+            return []
+        return sorted(self.honest_ids)[:k]
+
     def offer_candidates(self, node: Node, round_now: int, rng: random.Random) -> List[int]:
         if not self.active(round_now):
             return []
         # POISONING!!!!!!!!!!!!!!!!!
         # za svaki honest čvor, u listu kandidata se stave svi napadači (koji već nisu njegove komšije)
         # to modeluje situaciju gde napadač (ili kompromitovan peer) preporučuje druge napadače
-        offers = [m for m in sorted(self.malicious_ids) if m not in node.peers]
+        targets = self.targets()
+        # kod ciljanog Eclipse napada napadacki identiteti se nude iskljucivo zrtvama;
+        # ostali honest cvorovi ne dobijaju nijednog napadaca u ponudi
+        if targets and node.node_id not in targets:
+            offers = []
+        else:
+            offers = [m for m in sorted(self.malicious_ids) if m not in node.peers]
         # u pravom sistemu čvor bi otkrivao i honest i napadačke kandidate, ne samo napadače
         # ovo je „šum" da poisoning ne bude previše očigledan (da nije samo napadači u ponudi)
         honest_pool = [

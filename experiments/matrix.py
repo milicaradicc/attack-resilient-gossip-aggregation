@@ -7,12 +7,10 @@ import os
 from typing import List
 
 from aggregation import get_aggregation
-from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
-from experiments.config import RunSpec, load_matrix
-from experiments.engine import Engine
-from core.setup import RunConfig, build_nodes, seed_observations, register_all
-from identity.registry import IdentityParams, IdentityRegistry
+from core.config import RunSpec, load_matrix
+from core.engine import Engine
+from core.setup import build_world
 from metrics.experiment_metrics import FIELDS, ExperimentMetrics
 from sampling import get_strategy
 
@@ -37,64 +35,18 @@ SUMMARY_FIELDS = [
 
 
 def run_single(spec: RunSpec) -> ExperimentMetrics:
-    base = RunConfig(
-        n_honest=spec.n_honest,
-        peer_set_size=spec.peer_set_size,
-        num_rounds=spec.num_rounds,
-        global_seed=spec.seed,
-        value_low=spec.value_low,
-        value_high=spec.value_high,
-    )
-    nodes = build_nodes(base)
-    seed_observations(nodes)
+    # svet (cvorovi, identiteti, PoW registar, scenario) sklapa se u core/setup.py,
+    # istom funkcijom koju koristi i distribuirani controller
+    world = build_world(spec)
 
-    honest = set(nodes.keys())
-    n_byzantine, n_sybil = spec.malicious_counts()
-    b0 = spec.n_honest
-    byzantine = set(range(b0, b0 + n_byzantine))
-    sybil = set(range(b0 + n_byzantine, b0 + n_byzantine + n_sybil))
-
-    id_params = IdentityParams(
-        pow_difficulty_bits=spec.pow_difficulty_bits,
-        age_min=spec.age_min,
-        age_max=spec.age_max,
-        exchange_max=spec.exchange_max,
-        score_threshold=spec.score_threshold,
-        num_buckets=spec.num_buckets,
-        max_per_bucket=spec.max_per_bucket,
-        timeout_rounds=spec.timeout_rounds,
-    )
-    registry = register_all(honest | byzantine | sybil, id_params)
-
-    x_star = Engine.true_mean(nodes)
-    if n_byzantine + n_sybil == 0:
-        scenario = Scenario.benign(honest)
-    else:
-        scenario = Scenario(honest, byzantine, sybil, AttackParams(
-            byzantine_profile=spec.byzantine_profile,
-            coordinated_value=spec.coordinated_value,
-            extreme_offset=spec.extreme_offset,
-            random_low=spec.random_low,
-            random_high=spec.random_high,
-            low_bias=spec.low_bias,
-            stale_value=spec.stale_value,
-            poison_honest_offers=spec.poison_honest_offers,
-            x_star=x_star,
-            activate_round=spec.activate_round,
-            flooding=spec.flooding,
-            churn_period=spec.churn_period,
-            selective_p=spec.selective_p,
-            unresponsive_p=spec.unresponsive_p,
-        ))
-
-    metrics = ExperimentMetrics(x_star=x_star, num_buckets=spec.num_buckets)
-    sampling = get_strategy(spec.overlay, spec.peer_set_size, registry, id_params)
+    metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
+    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
 
-    engine = Engine(nodes, aggregation, sampling, scenario, spec.num_rounds, metrics, rng,
-                    timeout_rounds=spec.timeout_rounds)
+    engine = Engine(world.nodes, aggregation, sampling, world.scenario, spec.num_rounds,
+                    metrics, rng, timeout_rounds=spec.timeout_rounds)
     engine.run()
     return metrics
 

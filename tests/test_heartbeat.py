@@ -8,7 +8,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from attacks.scenario import AttackParams, Scenario
-from experiments.config import RunSpec
+from core.config import RunSpec
 from experiments.matrix import run_single
 
 RNG = random.Random(0)

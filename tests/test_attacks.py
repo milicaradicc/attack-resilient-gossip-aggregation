@@ -8,15 +8,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from attacks.scenario import AttackParams, Scenario
 from core.node import Node
-from core.setup import RunConfig
-from experiments.scenarios import AttackConfig, run_attack as run
-from identity.registry import IdentityParams
+from tests.helpers import run_attack as run
 
-SMALL = AttackConfig(
-    base=RunConfig(n_honest=8, peer_set_size=7, num_rounds=20, global_seed=42),
-    n_sybil=3, n_byzantine=2,
-)
-FAST = IdentityParams(pow_difficulty_bits=8)
+SMALL = dict(n_honest=8, beta=0.4, num_rounds=20, seed=42, pow_difficulty_bits=8)
 
 
 def _scenario():
@@ -46,19 +40,19 @@ def test_offer_candidates_include_malicious():
 
 
 def test_structural_defense_reduces_penetration():
-    random_pen = run(SMALL, "random", "mean", FAST)[-1].sybil_penetration
-    eclipse_pen = run(SMALL, "eclipse_resistant", "mean", FAST)[-1].sybil_penetration
+    random_pen = run("random", "mean", **SMALL)[-1].sybil_penetration
+    eclipse_pen = run("eclipse_resistant", "mean", **SMALL)[-1].sybil_penetration
     assert random_pen > eclipse_pen
 
 
 def test_robust_aggregation_helps_under_defense():
-    mean_err = run(SMALL, "sybil_resistant", "mean", FAST)[-1].err_rel
-    median_err = run(SMALL, "sybil_resistant", "median", FAST)[-1].err_rel
+    mean_err = run("sybil_resistant", "mean", **SMALL)[-1].err_rel
+    median_err = run("sybil_resistant", "median", **SMALL)[-1].err_rel
     assert median_err < mean_err
 
 
 def test_robust_aggregation_insufficient_without_structure():
-    median_err = run(SMALL, "random", "median", FAST)[-1].err_rel
+    median_err = run("random", "median", **SMALL)[-1].err_rel
     assert median_err > 1.0
 
 
