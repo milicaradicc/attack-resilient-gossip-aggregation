@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from statistics import mean, pvariance
 from typing import Dict, List
 
-from attacks.scenario import Scenario
-from core.node import Node
 from identity.buckets import bucket_of
 
 FIELDS = [

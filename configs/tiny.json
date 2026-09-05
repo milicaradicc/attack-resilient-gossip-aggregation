@@ -1,0 +1,11 @@
+{
+  "n_honest": [8],
+  "beta": [0.0, 0.3],
+  "overlay": ["random", "eclipse_resistant"],
+  "aggregation": ["mean", "trimmed_mean"],
+  "seeds": [1],
+  "num_rounds": 12,
+  "activate_round": 1,
+  "pow_difficulty_bits": 8,
+  "conv_window_start": 5
+}

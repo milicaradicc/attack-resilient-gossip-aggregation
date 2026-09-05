@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from statistics import mean
 from typing import Dict, Set
 
+from attacks.scenario import AttackParams, Scenario
 from core.node import Node
 from core.overlay import build_random_overlay
 from core.rng import make_rng
@@ -50,3 +52,85 @@ def register_all(ids: Set[int], params: IdentityParams) -> IdentityRegistry:
     for i in ids:
         registry.register(i, solve_pow(str(i), params.pow_difficulty_bits))
     return registry
+
+
+def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
+    # beta je udeo zlonamernih u CELOJ mrezi: beta = n_mal / (n_honest + n_mal)
+    # resavanjem po n_mal dobija se n_mal = n_honest * beta / (1 - beta)
+    # jedno mesto za ovu formulu; koriste je i config, i gen_compose, i controller
+    if beta <= 0.0:
+        return 0, 0
+    n_mal = round(n_honest * beta / (1.0 - beta))
+    n_byzantine = round(n_mal * byzantine_fraction)
+    return n_byzantine, n_mal - n_byzantine
+
+
+@dataclass
+class World:
+    # sve sto cini jedan eksperiment pre nego sto krene izvrsavanje
+    cfg: RunConfig
+    nodes: Dict[int, Node]
+    honest: Set[int]
+    byzantine: Set[int]
+    sybil: Set[int]
+    registry: IdentityRegistry
+    id_params: IdentityParams
+    scenario: Scenario
+    x_star: float
+
+
+def build_world(spec) -> World:
+    # jedno mesto na kome se sklapa svet: cvorovi, identiteti, PoW registar i scenario napada
+    # koriste ga i in-process matrica (experiments/matrix.py) i distribuirani controller,
+    # da se priprema eksperimenta ne bi duplirala i vremenom razisla
+    cfg = RunConfig(
+        n_honest=spec.n_honest,
+        peer_set_size=spec.peer_set_size,
+        num_rounds=spec.num_rounds,
+        global_seed=spec.seed,
+        value_low=spec.value_low,
+        value_high=spec.value_high,
+    )
+    nodes = build_nodes(cfg)
+    seed_observations(nodes)
+
+    honest = set(nodes.keys())
+    n_byzantine, n_sybil = spec.malicious_counts()
+    b0 = spec.n_honest
+    byzantine = set(range(b0, b0 + n_byzantine))
+    sybil = set(range(b0 + n_byzantine, b0 + n_byzantine + n_sybil))
+
+    id_params = IdentityParams(
+        pow_difficulty_bits=spec.pow_difficulty_bits,
+        age_min=spec.age_min,
+        age_max=spec.age_max,
+        exchange_max=spec.exchange_max,
+        score_threshold=spec.score_threshold,
+        num_buckets=spec.num_buckets,
+        max_per_bucket=spec.max_per_bucket,
+        timeout_rounds=spec.timeout_rounds,
+    )
+    registry = register_all(honest | byzantine | sybil, id_params)
+    x_star = mean(n.x_local for n in nodes.values())
+
+    if n_byzantine + n_sybil == 0:
+        scenario = Scenario.benign(honest)
+    else:
+        scenario = Scenario(honest, byzantine, sybil, AttackParams(
+            byzantine_profile=spec.byzantine_profile,
+            coordinated_value=spec.coordinated_value,
+            extreme_offset=spec.extreme_offset,
+            random_low=spec.random_low,
+            random_high=spec.random_high,
+            low_bias=spec.low_bias,
+            stale_value=spec.stale_value,
+            poison_honest_offers=spec.poison_honest_offers,
+            x_star=x_star,
+            activate_round=spec.activate_round,
+            flooding=spec.flooding,
+            churn_period=spec.churn_period,
+            selective_p=spec.selective_p,
+            unresponsive_p=spec.unresponsive_p,
+        ))
+
+    return World(cfg, nodes, honest, byzantine, sybil, registry, id_params, scenario, x_star)

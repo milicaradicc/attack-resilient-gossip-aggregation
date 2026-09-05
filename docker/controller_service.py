@@ -5,12 +5,10 @@ import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from statistics import mean
 
-from attacks.scenario import AttackParams, Scenario
 from core.rng import make_rng
-from core.setup import RunConfig, build_nodes, register_all, seed_observations
-from identity.registry import IdentityParams
+from core.setup import build_world
+from core.config import load_defaults, spec_from
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
 
@@ -32,68 +30,43 @@ class _OfferView:
 
 
 class ControllerState:
-    def __init__(self, 
-                cfg, 
-                id_params, 
-                strategy_name, 
-                aggregation_name,
-                n_byzantine, 
-                n_sybil, 
-                coordinated_value, 
-                byzantine_profile,
-                activate_round, 
-                timeout_rounds, 
-                unresponsive_p, 
-                flooding,
-                churn_period, 
-                selective_p, 
-                trim_alpha, 
-                verbose=False
-                ):
-        self.cfg = cfg
-        self.id_params = id_params
-        self.strategy_name = strategy_name
-        self.aggregation_name = aggregation_name
-        self.timeout_rounds = timeout_rounds
-        self.trim_alpha = trim_alpha
+    def __init__(self, spec, verbose=False, rng=None):
+        # spec je RunSpec (experiments/config.py) — ista definicija konfiguracije
+        # koju koristi i in-process matrica
+        self.spec = spec
+        self.strategy_name = spec.overlay
+        self.aggregation_name = spec.aggregation
+        self.timeout_rounds = spec.timeout_rounds
+        self.trim_alpha = spec.trim_alpha
         self.verbose = verbose
 
-        nodes = build_nodes(cfg) # prave se honest cvorove sa pocetnim vrednostima  i topologijom (deterministicki, seed)
-        seed_observations(nodes) # za svaki cvor se pisu pocetne observacije za komsije, starost krece od 0
+        # svet se sklapa istom funkcijom kao u in-process matrici (core/setup.py)
+        world = build_world(spec)
+        self.cfg = world.cfg
+        self.id_params = world.id_params
+        nodes = world.nodes
         self.n = len(nodes)
         self.assignments = {i: {"x_local": n.x_local, "peers": list(n.peers)}
                             for i, n in nodes.items()}
-        honest = set(nodes.keys()) # 0...n-1
-        byzantine = set(range(self.n, self.n + n_byzantine)) # n...nb
-        sybil = set(range(self.n + n_byzantine, self.n + n_byzantine + n_sybil))
-        self.honest, self.byzantine, self.sybil = honest, byzantine, sybil
-        self.n_total = self.n + n_byzantine + n_sybil
-        self.registry = register_all(honest | byzantine | sybil, id_params)
-        self.x_star = mean(n.x_local for n in nodes.values()) # prava srednja vrednost, sistem ovo treba da pogodi
-        self.num_rounds = cfg.num_rounds
+        self.honest, self.byzantine, self.sybil = world.honest, world.byzantine, world.sybil
+        self.n_total = self.n + len(world.byzantine) + len(world.sybil)
+        self.registry = world.registry
+        self.x_star = world.x_star
+        self.num_rounds = world.cfg.num_rounds
+        self.scenario = world.scenario
+        self.params = world.scenario.params
 
-        self.params = AttackParams(
-            byzantine_profile=byzantine_profile, 
-            coordinated_value=coordinated_value,
-            x_star=self.x_star, 
-            activate_round=activate_round, 
-            flooding=flooding,
-            churn_period=churn_period, 
-            selective_p=selective_p, 
-            unresponsive_p=unresponsive_p)
-        self.scenario = Scenario(honest, byzantine, sybil, self.params)
-        self.rng = make_rng(cfg.global_seed, "attack")
+        self.rng = rng if rng is not None else make_rng(spec.seed, "attack")
 
         self.peers_in = {}
         self.offers = {} # kes kandidata 
         self.offers_done = set()
         self.broadcasts = {}
         self.reports = {}
-        self.recorded = set()
+        self.recorded = {0} # runda 0 se belezi ispod, mora da udje da bi complete() bio tacan
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
-        self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=id_params.num_buckets)
+        self.metrics = ExperimentMetrics(x_star=self.x_star, num_buckets=world.id_params.num_buckets)
         self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
-        self.rows = []
         self.lock = threading.Lock()
 
     def config_payload(self):
@@ -197,9 +170,6 @@ def make_handler(state):
                     ready = (r, i) in state.offers
                     offers = state.offers.get((r, i))
                 self._send(200 if ready else 425, {"offers": offers} if ready else {"ready": False})
-            elif parts[0] == "rows":
-                self._send(200, {"rows": state.rows, "num_rounds": state.num_rounds,
-                                 "x_star": state.x_star})
             else:
                 self._send(404, {})
 
@@ -247,29 +217,35 @@ def _write_results(state, path):
 
 
 def main():
-    n_honest = int(os.environ.get("N_HONEST", "15"))
-    beta = float(os.environ.get("BETA", "0.3"))
-    n_mal = round(n_honest * beta / (1.0 - beta)) if beta > 0 else 0
-    n_byz = round(n_mal * float(os.environ.get("BYZANTINE_FRACTION", "0.34")))
-    n_syb = n_mal - n_byz
-    cfg = RunConfig(n_honest=n_honest, peer_set_size=int(os.environ.get("PEER_SET_SIZE", "7")),
-                    num_rounds=int(os.environ.get("ROUNDS", "50")),
-                    global_seed=int(os.environ.get("SEED", "42")))
-    id_params = IdentityParams(pow_difficulty_bits=int(os.environ.get("POW_BITS", "12")),
-                               num_buckets=int(os.environ.get("NUM_BUCKETS", "8")),
-                               timeout_rounds=int(os.environ.get("TIMEOUT_ROUNDS", "3")))
-    state = ControllerState(
-        cfg, id_params, os.environ.get("STRATEGY", "eclipse_resistant"),
-        os.environ.get("AGGREGATION", "trimmed_mean"), n_byz, n_syb,
-        float(os.environ.get("COORDINATED_VALUE", "1000.0")),
-        os.environ.get("BYZANTINE_PROFILE", "coordinated"),
-        int(os.environ.get("WARMUP", "10")) + 1, id_params.timeout_rounds,
-        float(os.environ.get("UNRESPONSIVE_P", "0.0")), int(os.environ.get("FLOODING", "0")),
-        int(os.environ.get("CHURN_PERIOD", "0")), float(os.environ.get("SELECTIVE_P", "1.0")),
-        float(os.environ.get("TRIM_ALPHA", "0.2")), verbose=True)
+    # jedan scenario: env varijable su samo izmene u odnosu na configs/defaults.json
+    d = load_defaults()
+    env = lambda k, default: os.environ.get(k, str(default))
+    spec = spec_from(
+        n_honest=int(env("N_HONEST", d["n_honest"][0])),
+        beta=float(env("BETA", d["beta"][0])),
+        overlay=env("STRATEGY", d["overlay"][0]),
+        aggregation=env("AGGREGATION", d["aggregation"][0]),
+        seed=int(env("SEED", d["seeds"][0])),
+        peer_set_size=int(env("PEER_SET_SIZE", d["peer_set_size"])),
+        num_rounds=int(env("ROUNDS", d["num_rounds"])),
+        coordinated_value=float(env("COORDINATED_VALUE", d["coordinated_value"])),
+        activate_round=int(env("WARMUP", d["warmup"])) + 1,
+        pow_difficulty_bits=int(env("POW_BITS", d["pow_difficulty_bits"])),
+        num_buckets=int(env("NUM_BUCKETS", d["num_buckets"])),
+        byzantine_fraction=float(env("BYZANTINE_FRACTION", d["byzantine_fraction"])),
+        byzantine_profile=env("BYZANTINE_PROFILE", d["byzantine_profile"][0]),
+        flooding=int(env("FLOODING", d["flooding"])),
+        churn_period=int(env("CHURN_PERIOD", d["churn_period"])),
+        selective_p=float(env("SELECTIVE_P", d["selective_p"])),
+        timeout_rounds=int(env("TIMEOUT_ROUNDS", d["timeout_rounds"])),
+        unresponsive_p=float(env("UNRESPONSIVE_P", d["unresponsive_p"])),
+        trim_alpha=float(env("TRIM_ALPHA", d["trim_alpha"])),
+    )
+    n_byz, n_syb = spec.malicious_counts()
+    state = ControllerState(spec, verbose=True)
     port = int(os.environ.get("PORT", "8000"))
     server = serve(state, "0.0.0.0", port)
-    print(f"controller up: n={state.n} byz={n_byz} sybil={n_syb} beta={beta} "
+    print(f"controller up: n={state.n} byz={n_byz} sybil={n_syb} beta={spec.beta} "
           f"strategy={state.strategy_name} agg={state.aggregation_name} x_star={state.x_star:.4f}",
           flush=True)
 
