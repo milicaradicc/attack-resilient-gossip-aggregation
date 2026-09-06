@@ -47,6 +47,44 @@ def test_every_node_reaches_consensus():
             f"cvor {node_id} nije konvergirao: {node.estimate} vs {world.x_star}")
 
 
+def test_defenses_do_not_break_benign_convergence():
+    # 5.2.6: cilj testa nije analiza otpornosti nego potvrda da overlay strategije
+    # ne narusavaju benignu konvergenciju — sve tri moraju dati isti rezultat
+    results = {}
+    for overlay in ("random", "sybil_resistant", "eclipse_resistant"):
+        spec = spec_from(n_honest=10, beta=0.0, overlay=overlay, aggregation="mean",
+                         seed=42, num_rounds=50)
+        world, _ = _run_world(spec)
+        for node_id, node in world.nodes.items():
+            assert abs(node.estimate - world.x_star) < 0.01, (
+                f"{overlay}: cvor {node_id} nije konvergirao")
+        results[overlay] = round(world.nodes[0].estimate, 9)
+    assert len(set(results.values())) == 1, f"strategije se razlikuju: {results}"
+
+
+def test_initial_values_are_random_but_reproducible():
+    # 5.2.6: honest cvorovi dobijaju slucajne pocetne vrednosti iz zadatog opsega,
+    # ali iste za isti seed (4.10)
+    spec = spec_from(n_honest=10, beta=0.0, seed=42)
+    first, _ = _run_world(spec)
+    second, _ = _run_world(spec)
+    values = [n.x_local for n in first.nodes.values()]
+    assert len(set(values)) > 1, "pocetne vrednosti nisu razlicite"
+    assert all(spec.value_low <= v <= spec.value_high for v in values)
+    assert values == [n.x_local for n in second.nodes.values()]
+
+
+def test_convergence_limited_by_irregular_topology():
+    # Poznato ogranicenje: pri neparnom broju cvorova i neparnom K regularan graf
+    # ne postoji (n*k mora biti paran), pa jedan cvor ima K-1 suseda i konsenzus
+    # se blago pomera. Test belezi granicu umesto da je precuti.
+    spec = spec_from(n_honest=15, beta=0.0, overlay="random", aggregation="mean",
+                     seed=42, num_rounds=50)
+    world, _ = _run_world(spec)
+    worst = max(abs(n.estimate - world.x_star) for n in world.nodes.values())
+    assert worst < 0.05, f"odstupanje {worst} vece od ocekivanog reda 1e-2"
+
+
 def test_topology_is_regular():
     # svaki cvor bira tacno k suseda; k-regularan graf postoji samo kada je n*k paran,
     # pa je za neparno n (npr. 15) jedan cvor sa k-1 suseda neizbezan
@@ -93,6 +131,9 @@ def test_different_seed_differs():
 if __name__ == "__main__":
     test_benign_convergence()
     test_every_node_reaches_consensus()
+    test_defenses_do_not_break_benign_convergence()
+    test_initial_values_are_random_but_reproducible()
+    test_convergence_limited_by_irregular_topology()
     test_topology_is_regular()
     test_replay_reproduces_peer_sets()
     test_determinism()
