@@ -79,11 +79,17 @@ class ExperimentMetrics:
     per_node: bool = False
     node_rows: List[NodeMetrics] = field(default_factory=list)
 
+    def _node_error(self, estimate: float) -> float:
+        # relativno odstupanje jednog cvora od stvarne srednje vrednosti honest cvorova
+        return (abs(estimate - self.x_star) / abs(self.x_star)
+                if self.x_star else abs(estimate))
+
     def record(self, round_no, nodes, scenario, counters=None) -> RoundMetrics:
         c = counters or RoundCounters()
         estimates = [n.estimate for n in nodes.values()]
         avg = mean(estimates)
-        err = abs(avg - self.x_star) / abs(self.x_star) if self.x_star else abs(avg)
+        # relativna greska
+        err = mean(self._node_error(e) for e in estimates)
         spread = max(estimates) - min(estimates)
         pen = mean(self._sybil_share(n, scenario) for n in nodes.values())
         eclipsed = sum(1 for n in nodes.values() if not self._has_honest_peer(n, scenario))
@@ -103,8 +109,7 @@ class ExperimentMetrics:
     def _record_nodes(self, round_no, nodes, scenario) -> None:
         for node_id, node in sorted(nodes.items()):
             honest_peers = sum(1 for p in node.peers if p in scenario.honest_ids)
-            err = (abs(node.estimate - self.x_star) / abs(self.x_star)
-                   if self.x_star else abs(node.estimate))
+            err = self._node_error(node.estimate)
             self.node_rows.append(NodeMetrics(
                 round=round_no, node_id=node_id, estimate=node.estimate, err_rel=err,
                 peer_count=len(node.peers),
@@ -145,9 +150,10 @@ class ExperimentMetrics:
             return 0.0
         return max(self._bucket_counts(node).values()) / len(node.peers)
 
-    def convergence_time(self, epsilon):
+    def convergence_time(self, epsilon, since=1):
+        # vreme konvergencije
         for r in self.rows:
-            if r.round >= 1 and r.err_rel < epsilon:
+            if r.round >= since and r.err_rel < epsilon:
                 return r.round
         return -1
 

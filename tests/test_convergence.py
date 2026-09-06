@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.config import spec_from
-from core.engine import Engine
+from in_process.engine import Engine
 from core.rng import make_rng
 from core.setup import build_world
 from aggregation import get_aggregation

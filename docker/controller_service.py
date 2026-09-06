@@ -40,7 +40,7 @@ class _OfferView:
 
 class ControllerState:
     def __init__(self, spec, verbose=False, rng=None):
-        # spec je RunSpec (experiments/config.py) — ista definicija konfiguracije
+        # spec je RunSpec (in_process/config.py) — ista definicija konfiguracije
         # koju koristi i in-process matrica
         self.spec = spec
         self.strategy_name = spec.overlay

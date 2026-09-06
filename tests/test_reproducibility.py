@@ -9,7 +9,7 @@ sys.path.insert(0, ROOT)
 
 from core.config import spec_from
 from core.rng import make_rng
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 # 4.10: isti eksperiment mora dati identican rezultat i izmedju POKRETANJA,
 # ne samo unutar istog procesa. Ugradjeni hash() se ne sme koristiti kao izvor
@@ -18,7 +18,7 @@ from experiments.matrix import run_single
 SNIPPET = (
     "import sys; sys.path.insert(0, {root!r});"
     "from core.config import spec_from;"
-    "from experiments.matrix import run_single;"
+    "from in_process.matrix import run_single;"
     "s = spec_from(n_honest=15, beta=0.2, overlay='eclipse_resistant',"
     " aggregation='mean', seed=1, num_rounds=20, activate_round=1,"
     " pow_difficulty_bits=8, byzantine_profile={profile!r});"
@@ -66,7 +66,7 @@ def test_exported_files_are_identical():
     import filecmp
     import json
     import tempfile
-    from experiments.matrix import run_matrix
+    from in_process.matrix import run_matrix
 
     config = os.path.join(ROOT, "configs", "tiny.json")
     with open(config) as f:

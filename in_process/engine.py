@@ -5,9 +5,6 @@ from metrics.experiment_metrics import RoundCounters
 
 
 class Engine:
-    # in-process pokretac: hrani zajednicku per-cvor logiku (core/round_ops.py)
-    # podacima iz memorije; distribuirana verzija (docker/node_service.py) hrani
-    # iste te funkcije podacima preko HTTP-a
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
                  timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
@@ -18,12 +15,14 @@ class Engine:
         self.metrics = metrics
         self.rng = rng
         self.timeout_rounds = timeout_rounds
-        self.trace = trace # 5.1.8: opcioni zapis dogadjaja
+        self.trace = trace 
 
     def _discover(self, round_now, counter=None):
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
+            # 4.5: periodicno osvezavanje peer set-a pre prijema novih kandidata
+            self.sampling.refresh_peers(node, round_now, self.rng)
             # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
@@ -69,7 +68,8 @@ class Engine:
                 peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
                 responders, t = self._heartbeat(node, peers, r, counter=counter)
                 timeouts += t
-                incoming = [broadcast[p] for p in responders] # data poruke onih koji su odgovorili
+                # lazni identiteti (flooding) nemaju emitovanu vrednost
+                incoming = [broadcast[p] for p in responders if p in broadcast]
                 counter.add_all(incoming)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)

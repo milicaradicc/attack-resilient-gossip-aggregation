@@ -1,0 +1,9 @@
+{
+  "n_honest": [15],
+  "beta": [0.2],
+  "overlay": ["random", "sybil_resistant", "eclipse_resistant"],
+  "aggregation": ["trimmed_mean"],
+  "seeds": [1, 2, 3],
+  "churn_period": [0, 3, 5, 10],
+  "activate_round": 1
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import List
 
 from core.config import spec_from
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 # Pomocni pokretaci za testove: sklapaju RunSpec i pustaju istu putanju
 # (run_single -> build_world -> Engine) koju koristi i puna matrica.

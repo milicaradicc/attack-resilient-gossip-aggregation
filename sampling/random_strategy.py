@@ -5,11 +5,6 @@ from typing import List, Optional
 
 from core.node import Node
 
-# pokazuje ponasanje sistema bez zastite
-# 4.5.1. Random baseline
-# • prihvata gotovo svakog kandidata,  
-# • koristi nasumični eviction,  
-# • nema admission zaštitu
 
 class RandomStrategy:
     name = "random"

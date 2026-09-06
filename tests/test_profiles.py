@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import RunSpec
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 
 def _spec(profile, overlay="eclipse_resistant", aggregation="mean", flooding=0):

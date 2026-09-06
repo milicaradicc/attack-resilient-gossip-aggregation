@@ -5,18 +5,11 @@ import random
 from core.rng import make_rng
 from typing import Dict, List, Optional, Protocol, Set, runtime_checkable
 
-# 5.1.6: svaki napad je nezavisan modul iza zajednickog interfejsa.
-# Modul definise trenutak aktivacije, ciljne cvorove, parametre ponasanja
-# i tip manipulacije. Scenario ih drzi i poziva redom, cime se napadi mogu
-# ukljucivati nezavisno i kombinovati u istom eksperimentu.
 
 FLOOD_BASE = 10_000
 
 
 def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Random:
-    # 4.10: svaki izvor randomness-a izvodi se iz globalnog eksperimentalnog seed-a.
-    # Ugradjeni hash() se NE koristi jer je nasumican po procesu (PYTHONHASHSEED),
-    # pa bi isti eksperiment davao razlicite rezultate izmedju pokretanja.
     return make_rng(ctx.params.experiment_seed, purpose, identity, round_now)
 
 
@@ -46,13 +39,11 @@ class AttackModule(Protocol):
     name: str
 
     def enabled(self, ctx: AttackContext) -> bool:
-        # da li je napad ukljucen u ovoj konfiguraciji
+        # da li je napad aktivan u eksperimentu
         ...
 
 
 class BaseAttack:
-    # podrazumevano ponasanje: modul ne dira nijednu fazu runde dok ga
-    # konkretna implementacija ne prepise
     name: str = "base"
 
     def enabled(self, ctx: AttackContext) -> bool:
@@ -69,7 +60,7 @@ class BaseAttack:
         return None
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
-        # faza heartbeat: vrati False za cutanje ili None ako modul ne odlucuje
+        # faza heartbeat: vrati False za cutanje i ignorise poruke ili None ako modul ne odlucuje
         return None
 
     def before_round(self, ctx: AttackContext, nodes: Dict[int, object],

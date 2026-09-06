@@ -11,7 +11,7 @@ sys.path.insert(0, ROOT)
 
 from attacks.scenario import AttackParams, Scenario
 from core.config import spec_from
-from experiments.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, run_matrix, run_single
+from in_process.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, run_matrix, run_single
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS, ExperimentMetrics, RoundCounters
 
 # 5.2.9. Validacija metrike i eksport sistema
@@ -31,13 +31,23 @@ def _scenario(honest, byzantine, sybil):
 
 
 def test_error_and_spread_over_known_values():
-    # x* = 100; procene 98, 100, 102 -> prosek 100, greska 0, spread 4
+    # 6.3.1: greska se racuna PO CVORU pa usrednjava, ne kao greska proseka.
+    # x* = 100; procene 98, 100, 102 -> odstupanja 2, 0, 2 -> E = (0.02+0+0.02)/3
     metrics = ExperimentMetrics(x_star=100.0, num_buckets=8)
     nodes = {0: _Node(98.0, [1]), 1: _Node(100.0, [0]), 2: _Node(102.0, [0])}
     row = metrics.record(1, nodes, _scenario([0, 1, 2], [], []), RoundCounters())
     assert abs(row.avg_estimate - 100.0) < 1e-9
-    assert abs(row.err_rel - 0.0) < 1e-9
+    assert abs(row.err_rel - 0.04 / 3.0) < 1e-9
     assert abs(row.spread - 4.0) < 1e-9
+
+
+def test_error_is_average_of_node_errors_not_error_of_average():
+    # razlika se vidi kada odstupanja imaju suprotan znak: greska proseka bi bila 0
+    metrics = ExperimentMetrics(x_star=100.0, num_buckets=8)
+    nodes = {0: _Node(90.0, [1]), 1: _Node(110.0, [0])}
+    row = metrics.record(1, nodes, _scenario([0, 1], [], []), RoundCounters())
+    assert abs(row.avg_estimate - 100.0) < 1e-9
+    assert abs(row.err_rel - 0.1) < 1e-9
 
 
 def test_sybil_penetration_over_known_peer_sets():
@@ -87,6 +97,27 @@ def test_round_identifiers_are_consistent():
     assert rounds == list(range(0, spec.num_rounds + 1))
     node_rounds = {r.round for r in metrics.node_rows}
     assert node_rounds <= set(rounds)
+
+
+def test_convergence_time_measured_from_given_round():
+    # 6.3.2: T = min{t : E(t) < eps}, pri cemu merenje pocinje od zadate runde.
+    # Bez toga bi se merila konvergencija tokom warmup faze i rezultat bi bio
+    # isti bez obzira na napad.
+    spec = spec_from(n_honest=20, beta=0.3, overlay="random",
+                     aggregation="trimmed_mean", seed=1)
+    metrics = run_single(spec)
+    od_pocetka = metrics.convergence_time(spec.epsilon, since=1)
+    od_napada = metrics.convergence_time(spec.epsilon, since=spec.activate_round)
+    assert od_pocetka >= 1, "tokom warmup-a sistem konvergira"
+    assert od_napada == -1, "pod napadom bez zastite ne sme konvergirati"
+
+
+def test_convergence_time_returns_sentinel_when_never_reached():
+    metrics = ExperimentMetrics(x_star=100.0, num_buckets=8)
+    for round_no in range(0, 5):
+        metrics.record(round_no, {0: _Node(200.0, [1]), 1: _Node(200.0, [0])},
+                       _scenario([0, 1], [], []), RoundCounters())
+    assert metrics.convergence_time(0.05) == -1
 
 
 def test_csv_and_json_export_agree():
@@ -146,11 +177,14 @@ def test_trace_integrity():
 
 if __name__ == "__main__":
     test_error_and_spread_over_known_values()
+    test_error_is_average_of_node_errors_not_error_of_average()
     test_sybil_penetration_over_known_peer_sets()
     test_eclipse_rate_over_known_peer_sets()
     test_counters_are_carried_through()
     test_rejection_breakdown_sums_to_one()
     test_round_identifiers_are_consistent()
+    test_convergence_time_measured_from_given_round()
+    test_convergence_time_returns_sentinel_when_never_reached()
     test_csv_and_json_export_agree()
     test_exported_headers_match_definitions()
     test_trace_integrity()

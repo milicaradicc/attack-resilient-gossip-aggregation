@@ -9,7 +9,7 @@ sys.path.insert(0, ROOT)
 
 from attacks.scenario import AttackParams, Scenario
 from core.config import RunSpec
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 RNG = random.Random(0)
 
@@ -54,7 +54,7 @@ def test_no_timeouts_when_all_respond():
 
 def test_observation_counts_total_misses_and_timeouts():
     from core.setup import build_world
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics

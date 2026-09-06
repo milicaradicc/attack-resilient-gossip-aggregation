@@ -8,7 +8,7 @@ sys.path.insert(0, ROOT)
 
 from core import messages
 from core.config import spec_from
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 
 def test_message_has_required_fields():
@@ -44,7 +44,7 @@ def test_defense_raises_control_but_not_data():
 
 def test_all_control_types_are_used():
     from core.setup import build_world
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics

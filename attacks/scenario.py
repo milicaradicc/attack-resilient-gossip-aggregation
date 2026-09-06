@@ -22,19 +22,24 @@ class AttackParams:
     random_high: float = 1000.0
     low_bias: float = 5.0
     stale_value: float = 130.0
+
     x_star: float = 100.0
-    experiment_seed: int = 0 # 4.10: iz njega se izvode svi izvori randomness-a napada
+
+    experiment_seed: int = 0 
     activate_round: int = 1
+    
     poison_honest_offers: int = 1
+
     flooding: int = 0
+
     churn_period: int = 0
+
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
-    eclipse_targets: int = 0 # 0 = napad je „širok" (svi cvorovi); >0 = ciljani Eclipse na N zrtava
+
+    eclipse_targets: int = 0 
 
 
-# 5.1.6: redosled modula je fiksan zbog determinizma — poisoning pre flooding-a,
-# selective pre byzantine (jer selektivno cutanje ima prednost nad profilom).
 DEFAULT_MODULES = (
     ChurnAttack(),
     PeerPoisoningAttack(),
@@ -46,8 +51,6 @@ DEFAULT_MODULES = (
 
 @dataclass
 class Scenario:
-    # Scenario je koordinator: drzi ucesnike i parametre, a same napade
-    # izvrsavaju nezavisni moduli (attacks/*.py) iza zajednickog interfejsa
     honest_ids: Set[int]
     byzantine_ids: Set[int]
     sybil_ids: Set[int]
@@ -79,6 +82,10 @@ class Scenario:
         return self.ctx.targets()
 
     def responds(self, identity: int, round_now: int, rng: random.Random) -> bool:
+        # flooding uvodi identitete koji uopste ne postoje (FLOOD_BASE i dalje);
+        # takav peer nikada ne odgovara, pa ga heartbeat timeout uklanja
+        if identity >= FLOOD_BASE:
+            return False
         if not self.active(round_now) or identity not in self.malicious_ids:
             return True
         ctx = self.ctx

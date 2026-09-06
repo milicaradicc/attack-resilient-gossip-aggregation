@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import spec_from
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 # 5.2.8. Sanity check scenariji napada
 # Pre pune eksperimentalne matrice proveravaju se najjednostavniji scenariji sa

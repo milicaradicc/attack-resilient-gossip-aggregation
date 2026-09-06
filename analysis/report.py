@@ -7,6 +7,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from statistics import mean
+
 from analysis.loader import filter_rows, group_stats, group_values, load
 
 OVERLAYS = ["random", "sybil_resistant", "eclipse_resistant"]
@@ -197,6 +199,33 @@ def fig_victim_neighborhood(node_rows, beta, out_dir):
     plt.close(fig)
 
 
+def table_convergence(summary_rows, beta, out):
+    # 6.3.2: -1 znaci da sistem nikada nije dostigao prag i ne sme se usrednjavati
+    # sa brojem rundi, pa se prikazuje odvojeno kao udeo pokretanja bez konvergencije
+    lines = [f"## Vreme konvergencije (beta={beta})", "",
+             "| overlay \\ aggregation | " + " | ".join(AGGS) + " |",
+             "|---|" + "---|" * len(AGGS)]
+    for overlay in OVERLAYS:
+        cells = []
+        for aggregation in AGGS:
+            sel = [r for r in summary_rows
+                   if r["overlay"] == overlay and r["aggregation"] == aggregation
+                   and r["beta"] == beta]
+            times = [r["convergence_time"] for r in sel]
+            reached = [t for t in times if t >= 0]
+            if not reached:
+                cells.append("nikad")
+            elif len(reached) == len(times):
+                cells.append(f"{mean(reached):.1f}")
+            else:
+                cells.append(f"{mean(reached):.1f} ({len(times) - len(reached)}/"
+                             f"{len(times)} nikad)")
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    lines.append("")
+    with open(out, "a") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     # podrazumevano se izvestaj pravi iz rezultata dobijenih u Docker okruzenju;
@@ -241,6 +270,7 @@ def main() -> None:
 
     if os.path.exists(args.nodes):
         fig_victim_neighborhood(load(args.nodes), 0.4, args.figures)
+    table_convergence(summary, args.beta, args.tables)
     print(f"tables -> {args.tables}")
     print(f"figures -> {args.figures}/")
 

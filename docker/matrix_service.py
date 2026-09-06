@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler
 from docker.controller_service import ControllerState, _Server
 from core.rng import make_rng
 from core.config import RunSpec, load_matrix
-from experiments.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, summarize
+from in_process.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, summarize
 from metrics.event_trace import TRACE_FIELDS
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS
 

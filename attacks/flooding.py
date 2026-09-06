@@ -5,10 +5,6 @@ from typing import List
 
 from attacks.base import FLOOD_BASE, AttackContext, BaseAttack
 
-# 3.8: peer flooding — masovno reklamiranje neregistrovanih identiteta.
-# Cilj nije ulazak u peer set (kandidati nemaju validan PoW) nego opterecenje
-# admission mehanizma i porast kontrolnog overhead-a.
-
 
 class PeerFloodingAttack(BaseAttack):
     name = "peer_flooding"

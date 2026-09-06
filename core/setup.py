@@ -85,7 +85,7 @@ class World:
 
 def build_world(spec) -> World:
     # jedno mesto na kome se sklapa svet: cvorovi, identiteti, PoW registar i scenario napada
-    # koriste ga i in-process matrica (experiments/matrix.py) i distribuirani controller,
+    # koriste ga i in-process matrica (in_process/matrix.py) i distribuirani controller,
     # da se priprema eksperimenta ne bi duplirala i vremenom razisla
     cfg = RunConfig(
         n_honest=spec.n_honest,

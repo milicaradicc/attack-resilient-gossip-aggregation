@@ -4,10 +4,6 @@ from typing import Dict
 
 from attacks.base import AttackContext, BaseAttack
 
-# 3.8: churn — napadac periodicno "obnavlja" identitete kako bi izbegao
-# reputaciju. U kombinaciji sa age-gating politikom to podize cenu napada,
-# jer resetovan identitet ponovo ne zadovoljava minimalnu starost.
-
 
 class ChurnAttack(BaseAttack):
     name = "churn"

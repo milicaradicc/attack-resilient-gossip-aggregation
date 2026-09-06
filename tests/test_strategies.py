@@ -114,7 +114,7 @@ def test_peer_set_never_exceeds_limit():
     # da prekoraci K, ni tokom napada kada se kandidati guraju svake runde
     from core.config import spec_from
     from core.setup import build_world
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics
@@ -141,7 +141,7 @@ def test_eclipse_never_exceeds_bucket_limit():
     # stanjem peer set-ova posle punog pokretanja pod napadom, za sve velicine mreze.
     from collections import Counter
     from core.config import spec_from
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from core.setup import build_world
     from aggregation import get_aggregation

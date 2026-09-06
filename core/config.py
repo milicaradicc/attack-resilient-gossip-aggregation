@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from itertools import product
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
@@ -108,21 +109,36 @@ def _spec_fields(c, override=None):
     )
 
 
+# parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
+# kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
+SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p",
+             "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold")
+
+
+def _sweep_values(c, key, base):
+    value = c.get(key, base[key])
+    return value if isinstance(value, list) else [value]
+
+
 def load_matrix(path: str) -> List[RunSpec]:
     c, override = merged_config(path)
     base = _spec_fields(c, override)
+    extra = {k: _sweep_values(c, k, base) for k in SWEEPABLE}
     specs: List[RunSpec] = []
     for nh in c["n_honest"]:
         for beta in c["beta"]:
             for overlay in c["overlay"]:
                 for aggregation in c["aggregation"]:
                     for profile in c["byzantine_profile"]:
-                        for seed in c["seeds"]:
-                            specs.append(RunSpec(**{**base, "n_honest": nh, "beta": beta,
-                                                    "overlay": overlay,
-                                                    "aggregation": aggregation,
-                                                    "byzantine_profile": profile,
-                                                    "seed": seed}))
+                        for combo in product(*extra.values()):
+                            for seed in c["seeds"]:
+                                fields = {**base, "n_honest": nh, "beta": beta,
+                                          "overlay": overlay,
+                                          "aggregation": aggregation,
+                                          "byzantine_profile": profile,
+                                          "seed": seed}
+                                fields.update(dict(zip(extra.keys(), combo)))
+                                specs.append(RunSpec(**fields))
     return specs
 
 

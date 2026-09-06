@@ -10,7 +10,7 @@ sys.path.insert(0, ROOT)
 from docker.matrix_service import MatrixState, serve
 from docker.node_service import run_matrix_node
 from core.config import load_matrix
-from experiments.matrix import run_single, summarize
+from in_process.matrix import run_single, summarize
 
 CONFIG = os.path.join(ROOT, "configs", "tiny.json")
 

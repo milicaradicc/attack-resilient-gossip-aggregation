@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import RunSpec, load_matrix
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 
 def _spec(beta, overlay="sybil_resistant", aggregation="median"):
@@ -73,7 +73,7 @@ def test_rejection_breakdown_sums_and_bucket_occupancy():
 def test_json_export():
     import json
     import os
-    from experiments.matrix import run_matrix
+    from in_process.matrix import run_matrix
     out = os.path.join(ROOT, "results", "test_matrix.csv")
     js = os.path.join(ROOT, "results", "test_matrix.json")
     run_matrix(os.path.join(ROOT, "configs", "smoke.json"), out,

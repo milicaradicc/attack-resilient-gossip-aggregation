@@ -5,11 +5,6 @@ from typing import List
 
 from attacks.base import AttackContext, BaseAttack
 
-# 3.8: peer poisoning — kompromitovani cvorovi kroz peer-exchange reklamiraju
-# iskljucivo (ili uglavnom) zlonamerne identitete. Ovde se ujedno realizuje i
-# Sybil ulazak: svi napadacki identiteti se nude honest cvorovima.
-# Kod ciljanog Eclipse napada ponuda ide samo zrtvama (ctx.targets()).
-
 
 class PeerPoisoningAttack(BaseAttack):
     name = "peer_poisoning"

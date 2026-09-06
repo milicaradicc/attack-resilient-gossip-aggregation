@@ -5,10 +5,6 @@ from typing import Optional
 
 from attacks.base import AttackContext, BaseAttack, module_rng
 
-# 3.7: Byzantine cvorovi salju proizvoljne ili koordinisane agregacione vrednosti.
-# Tip manipulacije bira se profilom: coordinated (glavni), extreme, random,
-# low_biased i stale (delay, tj. zastarela vrednost).
-
 
 class ByzantineAttack(BaseAttack):
     name = "byzantine"

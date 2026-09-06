@@ -24,7 +24,7 @@ pokretaca koji istu logiku izvrsavaju na dva nacina.
                          |
           +--------------+--------------+
           |                             |
-    experiments/                    docker/
+    in_process/                    docker/
    (in-process, brzo)        (kontejner po cvoru, distribuirano)
 ```
 
@@ -108,7 +108,7 @@ pokretaca koji istu logiku izvrsavaju na dva nacina.
                          |
           +--------------+--------------+
           |                             |
-    experiments/                    docker/
+    in_process/                    docker/
    (in-process, brzo)        (kontejner po cvoru, distribuirano)
 ```
 
@@ -177,10 +177,10 @@ pip install -r requirements.txt
 
 ```bash
 # puna matrica: 3 (N) x 4 (beta) x 3 (overlay) x 3 (agregacija) x 5 (seed) = 540
-python -m experiments.matrix --config configs/main.json --out results/main.csv
+python -m in_process.matrix --config configs/main.json --out results/main.csv
 
 # ablacije: sweep Byzantine profila (45 pokretanja)
-python -m experiments.matrix --config configs/ablation.json --out results/ablation.csv
+python -m in_process.matrix --config configs/ablation.json --out results/ablation.csv
 
 # tabele i grafikoni
 python -m analysis.report --beta 0.3
@@ -280,7 +280,7 @@ aggregation/  base, mean, median, trimmed_mean
 sampling/     base, random_strategy, sybil_resistant, eclipse_resistant
 attacks/      scenario (napadi kao parametrizovani profili)
 metrics/      experiment_metrics (per-round + run-level + CSV/JSON)
-experiments/  matrix (pokretanje eksperimentalne matrice)
+in_process/  matrix (pokretanje eksperimentalne matrice)
 docker/       controller_service, node_service, matrix_service,
               entrypoint, gen_compose, Dockerfile
 analysis/     loader, report (tabele + grafikoni)
