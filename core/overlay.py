@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import math
 import random
-from collections import deque
+from collections import Counter, deque
 from typing import Dict, List, Set, Tuple
 
+from identity.buckets import bucket_of
 
-def build_random_overlay(n: int, k: int, rng: random.Random) -> Dict[int, List[int]]:
+
+def build_random_overlay(n: int, k: int, rng: random.Random,
+                         num_buckets: int = 0, max_per_bucket: int = 0) -> Dict[int, List[int]]:
     # regularna topologija: svaki cvor ima tacno k suseda.
     # razlog: gossip usrednjavanje konvergira ka stepenski ponderisanom proseku,
     # pa nejednaki stepeni pomeraju konsenzus u odnosu na x* i kada nema napada.
@@ -19,7 +22,80 @@ def build_random_overlay(n: int, k: int, rng: random.Random) -> Dict[int, List[i
 
     adj = _regular_graph(n, k, rng)
     _connect_preserving_degrees(adj, rng)
+    if num_buckets > 0 and max_per_bucket > 0:
+        # 4.5.3: pocetni peer set-ovi treba da postuju bucket ogranicenje vec u
+        # prvoj rundi; inace bi cvorovi startovali sa prekoracenjem koje admission
+        # provera ne vidi (ona gleda samo nove kandidate)
+        _reduce_bucket_violations(adj, rng, num_buckets, max_per_bucket)
     return {i: sorted(adj[i]) for i in range(n)}
+
+
+def _violations(adj: Dict[int, Set[int]], num_buckets: int, limit: int) -> int:
+    # ukupno prekoracenje: koliko peer-ova preko dozvoljenog po bucketu
+    total = 0
+    for node, peers in adj.items():
+        counts = Counter(bucket_of(str(p), num_buckets) for p in peers)
+        total += sum(max(0, c - limit) for c in counts.values())
+    return total
+
+
+def _reduce_bucket_violations(adj: Dict[int, Set[int]], rng: random.Random,
+                              num_buckets: int, limit: int,
+                              attempts: int = 5000, patience: int = 300) -> None:
+    # Ciljana popravka: nadje se cvor koji ima previse peer-ova iz istog bucketa,
+    # pa se jedna njegova veza zameni sa vezom drugog para tako da prekoracenje
+    # opadne. Zamena para veza cuva stepene, pa graf ostaje regularan.
+    bucket = lambda i: bucket_of(str(i), num_buckets)
+    # kod nekih kombinacija (n, k, broj bucketa) potpuno postovanje ogranicenja
+    # nije moguce — tada se staje cim popravke prestanu da donose napredak
+    best = None
+    stale = 0
+    for _ in range(attempts):
+        over = _overfull(adj, bucket, limit)
+        if not over:
+            return
+        if best is None or len(over) < best:
+            best, stale = len(over), 0
+        else:
+            stale += 1
+            if stale >= patience:
+                return
+        node, target = rng.choice(over)
+        # peer iz prepunog bucketa koji ce biti zamenjen
+        b = rng.choice([p for p in adj[node] if bucket(p) == target])
+        # kandidat: cvor koji nije sused, iz bucketa koji kod nas nije popunjen
+        counts = Counter(bucket(p) for p in adj[node])
+        pool = [c for c in adj
+                if c != node and c not in adj[node]
+                and counts.get(bucket(c), 0) < limit]
+        if not pool:
+            continue
+        c = rng.choice(sorted(pool))
+        # da bi stepeni ostali isti, c mora da otpusti jednog svog suseda d,
+        # koji zatim preuzima vezu ka b
+        options = [d for d in adj[c] if d not in (node, b) and d not in adj[b]]
+        if not options:
+            continue
+        d = rng.choice(sorted(options))
+        adj[node].discard(b); adj[b].discard(node)
+        adj[c].discard(d); adj[d].discard(c)
+        adj[node].add(c); adj[c].add(node)
+        adj[b].add(d); adj[d].add(b)
+        if len(_components(adj)) > 1:
+            adj[node].discard(c); adj[c].discard(node)
+            adj[b].discard(d); adj[d].discard(b)
+            adj[node].add(b); adj[b].add(node)
+            adj[c].add(d); adj[d].add(c)
+
+
+def _overfull(adj: Dict[int, Set[int]], bucket, limit: int) -> List[Tuple[int, int]]:
+    # parovi (cvor, bucket) u kojima je ogranicenje prekoraceno
+    out = []
+    for node, peers in adj.items():
+        for target, count in Counter(bucket(p) for p in peers).items():
+            if count > limit:
+                out.append((node, target))
+    return sorted(out)
 
 
 def _regular_graph(n: int, k: int, rng: random.Random) -> Dict[int, Set[int]]:

@@ -21,7 +21,7 @@ class ChurnAttack(BaseAttack):
         if period <= 0 or round_now == 0 or round_now % period != 0:
             return
         for node in nodes.values():
-            for mid in ctx.malicious_ids:
+            for mid in sorted(ctx.malicious_ids):
                 obs = node.observations.get(mid)
                 if obs is not None:
                     obs.first_seen_round = round_now

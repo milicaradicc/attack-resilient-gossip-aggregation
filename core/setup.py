@@ -21,6 +21,8 @@ class RunConfig:
     global_seed: int = 42 # seed za reproduktivnost
     value_low: float = 50.0 # opseg vrednosti 50-150
     value_high: float = 150.0
+    num_buckets: int = 0 # >0 ukljucuje bucket-svesnu topologiju
+    max_per_bucket: int = 0
 
 
 def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
@@ -32,7 +34,9 @@ def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
         for i in range(cfg.n_honest)
     }
     # svakon cvoru se dodeljuju komsije, pravi se topologija
-    for i, peers in build_random_overlay(cfg.n_honest, cfg.peer_set_size, top_rng).items():
+    for i, peers in build_random_overlay(cfg.n_honest, cfg.peer_set_size, top_rng,
+                                        num_buckets=cfg.num_buckets,
+                                        max_per_bucket=cfg.max_per_bucket).items():
         nodes[i].peers = peers
     return nodes # {0: Node, 1: Node, ...}
 
@@ -90,6 +94,8 @@ def build_world(spec) -> World:
         global_seed=spec.seed,
         value_low=spec.value_low,
         value_high=spec.value_high,
+        num_buckets=spec.num_buckets,
+        max_per_bucket=spec.max_per_bucket,
     )
     nodes = build_nodes(cfg)
     seed_observations(nodes)

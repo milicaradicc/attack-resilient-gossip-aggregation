@@ -42,6 +42,16 @@ def test_valid_for_lower_difficulty():
     assert verify_pow("node-4", nonce, BITS - 4)
 
 
+def test_missing_nonce_rejected():
+    from identity.registry import IdentityRegistry
+    registry = IdentityRegistry()
+    assert registry.nonce_of(42) is None
+
+
+def test_zero_difficulty_accepts_any_nonce():
+    assert verify_pow("node-6", 0, 0)
+
+
 if __name__ == "__main__":
     for fn in list(globals().values()):
         if callable(fn) and getattr(fn, "__name__", "").startswith("test_"):

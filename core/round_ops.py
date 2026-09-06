@@ -125,7 +125,7 @@ def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int,
         # 5.1.5: emitovana vrednost je data poruka (tip, runda, izvor, payload)
         out[hid] = messages.data(round_now, hid,
                                  scenario.broadcast_value(hid, node.estimate, round_now))
-    for m in scenario.malicious_ids:
+    for m in sorted(scenario.malicious_ids): # fiksan redosled radi determinizma
         # vrati placeholder svakako se ne koristi ta vrednost
         out[m] = messages.data(round_now, m, scenario.broadcast_value(m, 0.0, round_now))
         if trace is not None and scenario.active(round_now):
