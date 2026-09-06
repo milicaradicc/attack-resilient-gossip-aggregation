@@ -4,3 +4,11 @@ __pycache__/
 
 results/
 figures/
+
+.vscode/
+
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
