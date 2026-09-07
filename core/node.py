@@ -14,7 +14,6 @@ class Node:
     peers: List[int] = field(default_factory=list) # lokalni peer set
     nonce: int = 0
     observations: Dict[int, Observation] = field(default_factory=dict) # observation log
-    # TODO lokalnu konfiguraciju overlay strategije
 
     @classmethod
     def create(cls, node_id: int, x_local: float) -> "Node":

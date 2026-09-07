@@ -21,9 +21,6 @@ class Engine:
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
-            # 4.5: periodicno osvezavanje peer set-a pre prijema novih kandidata
-            self.sampling.refresh_peers(node, round_now, self.rng)
-            # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
                                                      round_now, trace=self.trace,
@@ -55,7 +52,7 @@ class Engine:
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             # discover + admission
-            # 5.1.5: poruke se broje po klasi, iz stvarno poslatih poruka
+            # poruke se broje po klasi, iz stvarno poslatih poruka
             counter = messages.MessageCounter()
             offered, rejected, reasons = self._discover(r, counter=counter)
             # na pocetku runce snimak

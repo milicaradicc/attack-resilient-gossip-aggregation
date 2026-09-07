@@ -88,12 +88,15 @@ class ExperimentMetrics:
         c = counters or RoundCounters()
         estimates = [n.estimate for n in nodes.values()]
         avg = mean(estimates)
-        # relativna greska
+        # 6.3.1. Relativna greška agregacije 
         err = mean(self._node_error(e) for e in estimates)
         spread = max(estimates) - min(estimates)
+        # 6.3.4. Sybil penetration
         pen = mean(self._sybil_share(n, scenario) for n in nodes.values())
         eclipsed = sum(1 for n in nodes.values() if not self._has_honest_peer(n, scenario))
+        # 6.3.5. Eclipse success rate 
         eclipse_rate = eclipsed / len(nodes)
+        # diversity 6.3.6
         diversity = mean(self._diversity(n) for n in nodes.values())
         occupancy = mean(self._bucket_occupancy(n) for n in nodes.values())
         rm = RoundMetrics(
@@ -140,6 +143,7 @@ class ExperimentMetrics:
         return counts
 
     def _diversity(self, node):
+        # 6.3.6. Peer diversity 
         if not node.peers:
             return 0.0
         total = len(node.peers)
@@ -151,30 +155,35 @@ class ExperimentMetrics:
         return max(self._bucket_counts(node).values()) / len(node.peers)
 
     def convergence_time(self, epsilon, since=1):
-        # vreme konvergencije
+        # 6.3.2. Vreme konvergencije 
         for r in self.rows:
             if r.round >= since and r.err_rel < epsilon:
                 return r.round
         return -1
 
     def stability(self, window_start):
+        # 6.3.3. Stabilnost procene 
         vals = [r.avg_estimate for r in self.rows if r.round >= window_start]
         return pvariance(vals) if len(vals) >= 2 else 0.0
 
     def data_overhead(self, n_honest):
+        # 6.3.8. Data overhead
         vals = [r.data_msgs for r in self.rows if r.round >= 1]
         return mean(vals) / n_honest if vals else 0.0
 
     def control_overhead(self, n_honest):
+        # 6.3.7. Kontrolni overhead 
         vals = [r.control_msgs for r in self.rows if r.round >= 1]
         return mean(vals) / n_honest if vals else 0.0
 
     def rejected_ratio(self):
+        # 6.3.9. Rejected peer ratio
         offered = sum(r.offered for r in self.rows)
         rejected = sum(r.rejected for r in self.rows)
         return rejected / offered if offered else 0.0
 
     def mean_bucket_occupancy(self):
+        # 6.3.10. Bucket occupancy distribucija
         vals = [r.bucket_occupancy for r in self.rows if r.round >= 1]
         return mean(vals) if vals else 0.0
 

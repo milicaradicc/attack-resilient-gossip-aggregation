@@ -13,7 +13,6 @@ from metrics.event_trace import EventTrace
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
 
-# TODO: zasto kontroler nema prave node objekte pa pravi zamene
 class _Stub:
     __slots__ = ("peers", "estimate")
 

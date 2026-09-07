@@ -3,9 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
-# 5.1.5: sistem razlikuje dve klase poruka — control plane i data plane.
-# Svaka poruka nosi tip, identifikator runde, izvorni identitet i payload,
-# cime se overhead zastitnih mehanizama meri odvojeno od same gossip razmene.
 
 CONTROL = "control"
 DATA = "data"

@@ -4,9 +4,6 @@ import csv
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-# 5.1.8: pored metrika belezi se i tok dogadjaja — admission odluke, promene
-# peer set-a, aktivacija napada i agregacione vrednosti po rundi.
-# Zapis je opcion (trace_events u konfiguraciji) jer nad punom matricom raste brzo.
 
 TRACE_FIELDS = ["round", "event", "node_id", "peer_id", "detail", "value"]
 

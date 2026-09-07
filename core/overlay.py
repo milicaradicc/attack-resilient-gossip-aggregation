@@ -16,27 +16,17 @@ def build_random_overlay(n: int, k: int, rng: random.Random,
     # napomena: k-regularan graf postoji samo ako je n*k paran; kada nije
     # (npr. n=15, k=7), jedan cvor dobija k-1 suseda
     if n <= 1:
+        # nema suseda
         return {i: [] for i in range(n)}
     if k >= n:
+        # vise suseda nego cvorova, potpuno povezan graf
         return {i: sorted(j for j in range(n) if j != i) for i in range(n)}
 
     adj = _regular_graph(n, k, rng)
     _connect_preserving_degrees(adj, rng)
     if num_buckets > 0 and max_per_bucket > 0:
-        # 4.5.3: pocetni peer set-ovi treba da postuju bucket ogranicenje vec u
-        # prvoj rundi; inace bi cvorovi startovali sa prekoracenjem koje admission
-        # provera ne vidi (ona gleda samo nove kandidate)
         _reduce_bucket_violations(adj, rng, num_buckets, max_per_bucket)
     return {i: sorted(adj[i]) for i in range(n)}
-
-
-def _violations(adj: Dict[int, Set[int]], num_buckets: int, limit: int) -> int:
-    # ukupno prekoracenje: koliko peer-ova preko dozvoljenog po bucketu
-    total = 0
-    for node, peers in adj.items():
-        counts = Counter(bucket_of(str(p), num_buckets) for p in peers)
-        total += sum(max(0, c - limit) for c in counts.values())
-    return total
 
 
 def _reduce_bucket_violations(adj: Dict[int, Set[int]], rng: random.Random,
@@ -133,6 +123,7 @@ def _regular_graph(n: int, k: int, rng: random.Random) -> Dict[int, Set[int]]:
 def _shuffle_preserving_degrees(adj: Dict[int, Set[int]], rng: random.Random,
                                 rounds: int = 20) -> None:
     # zamena dva para veza: (a,b) i (c,d) -> (a,c) i (b,d); stepeni ostaju isti
+    # da bude slucajan
     n_edges = sum(len(v) for v in adj.values()) // 2
     for _ in range(rounds * n_edges):
         edges = _edges(adj)

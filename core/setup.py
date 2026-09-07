@@ -42,9 +42,6 @@ def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
 
 
 def seed_observations(nodes: Dict[int, Node]) -> None:
-    # za svaki cvor za svaki peer se belezi starost, od runde 0
-    # starost identiteta se računa kao (trenutna_runda - first_seen)
-    # TODO proveriti ostala polja jel se update kako treba
     for node in nodes.values():
         for peer in node.peers:
             node.observations[peer] = Observation(first_seen_round=0, last_seen_round=0)
@@ -59,9 +56,6 @@ def register_all(ids: Set[int], params: IdentityParams) -> IdentityRegistry:
 
 
 def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
-    # beta je udeo zlonamernih u CELOJ mrezi: beta = n_mal / (n_honest + n_mal)
-    # resavanjem po n_mal dobija se n_mal = n_honest * beta / (1 - beta)
-    # jedno mesto za ovu formulu; koriste je i config, i gen_compose, i controller
     if beta <= 0.0:
         return 0, 0
     n_mal = round(n_honest * beta / (1.0 - beta))
@@ -85,8 +79,6 @@ class World:
 
 def build_world(spec) -> World:
     # jedno mesto na kome se sklapa svet: cvorovi, identiteti, PoW registar i scenario napada
-    # koriste ga i in-process matrica (in_process/matrix.py) i distribuirani controller,
-    # da se priprema eksperimenta ne bi duplirala i vremenom razisla
     cfg = RunConfig(
         n_honest=spec.n_honest,
         peer_set_size=spec.peer_set_size,
@@ -132,7 +124,7 @@ def build_world(spec) -> World:
             stale_value=spec.stale_value,
             poison_honest_offers=spec.poison_honest_offers,
             x_star=x_star,
-            experiment_seed=spec.seed, # 4.10: randomness napada se izvodi iz istog seed-a
+            experiment_seed=spec.seed, 
             activate_round=spec.activate_round,
             flooding=spec.flooding,
             churn_period=spec.churn_period,

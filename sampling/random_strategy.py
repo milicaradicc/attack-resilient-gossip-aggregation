@@ -30,7 +30,3 @@ class RandomStrategy:
 
     def select_gossip_peers(self, node: Node, rng: random.Random) -> List[int]:
         return list(node.peers)
-
-    def choose_gossip_target(self, node: Node, rng: random.Random) -> Optional[int]:
-        peers = self.select_gossip_peers(node, rng)
-        return rng.choice(peers) if peers else None

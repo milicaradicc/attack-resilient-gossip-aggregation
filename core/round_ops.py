@@ -6,10 +6,6 @@ from attacks.base import FLOOD_BASE
 from core import messages
 from identity.observation import Observation
 
-# Zajednicka per-cvor logika jedne gossip runde.
-# Iste funkcije koristi in-process Engine (podaci iz memorije) i distribuirani
-# node_service (podaci preko HTTP-a), pa admission/heartbeat pravila postoje
-# samo na jednom mestu i ne mogu da se raziju izmedju dve putanje.
 
 REASON_KEYS = ("invalid_pow", "too_young", "low_score", "bucket_full", "self_or_duplicate")
 
@@ -35,15 +31,12 @@ def observe(node, other: int, round_now: int, exchanged: bool) -> None:
 
 def admit(node, offered: List[int], sampling, round_now: int,
           trace=None, counter=None) -> Tuple[int, int, Dict[str, int]]:
-    # discovery + admission + eviction za JEDAN cvor
-    # 'offered' su vec pribavljeni kandidati (Engine ih racuna, node ih dobija preko HTTP-a)
     reasons = empty_reasons()
     if trace is not None:
         flooded = sum(1 for c in offered if c >= FLOOD_BASE)
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
     for candidate in offered:
-        # 5.1.5: svaka ponuda kandidata je control poruka (peer exchange)
         if counter is not None:
             counter.add(messages.control(messages.PEER_EXCHANGE, round_now,
                                          node.node_id, candidate))
@@ -52,7 +45,7 @@ def admit(node, offered: List[int], sampling, round_now: int,
         # ako je kandidat vec komsija skip
         if candidate in node.peers:
             continue
-        # admission !!!!!!!!!!!! -> proverava PoW/starost/skor/bucket
+        # admission -> proverava PoW/starost/skor/bucket
         if sampling.accept_peer(node, candidate, round_now):
             # strategija odlucuje koga (i da li) izbaciti:
             # eclipse vraca najslabijeg iz istog bucketa kad je bucket pun,
@@ -89,7 +82,6 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
     # ko odgovara ostaje u razmeni, ko cuti skuplja propustene otkucaje
     responders = []
     for p in peers:
-        # 5.1.5: heartbeat je control poruka
         if counter is not None:
             counter.add(messages.control(messages.HEARTBEAT, round_now, node.node_id, p))
         if scenario.responds(p, round_now, rng):
@@ -118,8 +110,6 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
 
 def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int,
                        trace=None) -> Dict[int, object]:
-    # snapshot svih cvorova i malicijusa (koristi ga samo in-process putanja;
-    # u distribuiranoj verziji istu ulogu ima barijera na controlleru)
     out = {}
     for hid, node in nodes.items():
         # 5.1.5: emitovana vrednost je data poruka (tip, runda, izvor, payload)

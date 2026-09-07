@@ -300,7 +300,4 @@ raznovrsnosti. Delay i selective forwarding su modelovani na sloju vrednosti, ne
 na mreznom sloju. Partitioning napad nije implementiran jer zahteva viseskocno
 rutiranje koje sinhroni single-hop model nema. Metrike se prikupljaju agregatno
 po rundi, ne po cvoru, i izvoze se metrike a ne pun event trace.
-`refresh_peers` je no-op (discovery se izvrsava svake runde u motoru), a
-`choose_gossip_target` postoji radi poklapanja sa specifikacijom ali motor
-koristi `select_gossip_peers` (fanout = |P|), jer robusna agregacija zahteva
-skup vrednosti.
+`refresh_peers` je no-op (discovery se izvrsava svake runde u motoru)

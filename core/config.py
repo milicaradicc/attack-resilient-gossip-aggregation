@@ -109,8 +109,6 @@ def _spec_fields(c, override=None):
     )
 
 
-# parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
-# kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
 SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p",
              "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold")
 
@@ -143,8 +141,6 @@ def load_matrix(path: str) -> List[RunSpec]:
 
 
 def spec_from(**overrides) -> RunSpec:
-    # RunSpec od podrazumevanih vrednosti (configs/defaults.json) uz navedene izmene;
-    # koriste ga testovi i distribuirani controller (jedan scenario iz env varijabli)
     fields = _spec_fields(load_defaults())
     fields.update(overrides)
     return RunSpec(**fields)

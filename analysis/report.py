@@ -7,7 +7,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from statistics import mean
+from collections import Counter
+from statistics import mean, pstdev, pvariance
 
 from analysis.loader import filter_rows, group_stats, group_values, load
 
@@ -202,7 +203,7 @@ def fig_victim_neighborhood(node_rows, beta, out_dir):
 def table_convergence(summary_rows, beta, out):
     # 6.3.2: -1 znaci da sistem nikada nije dostigao prag i ne sme se usrednjavati
     # sa brojem rundi, pa se prikazuje odvojeno kao udeo pokretanja bez konvergencije
-    lines = [f"## Vreme konvergencije (beta={beta})", "",
+    lines = [f"## 7.5 Vreme konvergencije (beta={beta})", "",
              "| overlay \\ aggregation | " + " | ".join(AGGS) + " |",
              "|---|" + "---|" * len(AGGS)]
     for overlay in OVERLAYS:
@@ -226,6 +227,250 @@ def table_convergence(summary_rows, beta, out):
         f.write("\n".join(lines) + "\n")
 
 
+def fig_eclipse_over_time(round_rows, beta, out_dir):
+    # 7.4: Eclipse success rate kroz rounde. Koriste se podaci iz ciljanog
+    # scenarija (configs/eclipse.json), jer u glavnoj matrici napad je "sirok"
+    # pa do potpune izolacije ne dolazi ni kod referentne strategije.
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    sub = filter_rows(round_rows, beta=beta, aggregation="trimmed_mean")
+    for ov in OVERLAYS:
+        series = group_stats(filter_rows(sub, overlay=ov), ("round",), "eclipse_rate")
+        xs = sorted(series)
+        ax.plot([x[0] for x in xs], [series[x][0] for x in xs], label=ov)
+    ax.set_xlabel("runda")
+    ax.set_ylabel("eclipse rate")
+    ax.set_title(f"Eclipse success rate kroz vreme (beta={beta})")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "eclipse_over_time.png"), dpi=130)
+    plt.close(fig)
+
+
+def fig_diversity_over_time(round_rows, beta, out_dir):
+    # 7.7: Shannon entropija peer set-ova kroz rounde
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    sub = filter_rows(round_rows, beta=beta, aggregation="trimmed_mean")
+    for ov in OVERLAYS:
+        series = group_stats(filter_rows(sub, overlay=ov), ("round",), "peer_diversity")
+        xs = sorted(series)
+        ax.plot([x[0] for x in xs], [series[x][0] for x in xs], label=ov)
+    ax.set_xlabel("runda")
+    ax.set_ylabel("Shannon entropija")
+    ax.set_title(f"Peer diversity kroz vreme (beta={beta})")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "diversity_over_time.png"), dpi=130)
+    plt.close(fig)
+
+
+def fig_variance_over_time(round_rows, beta, window, out_dir):
+    # 7.6: pokretna varijansa procene, prozor duzine `window` rundi
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for agg in AGGS:
+        sub = filter_rows(round_rows, beta=beta, aggregation=agg,
+                          overlay="eclipse_resistant")
+        series = group_stats(sub, ("round",), "avg_estimate")
+        xs = sorted(series)
+        values = [series[x][0] for x in xs]
+        rounds, variances = [], []
+        for i in range(window, len(values)):
+            chunk = values[i - window:i]
+            variances.append(pvariance(chunk))
+            rounds.append(xs[i][0])
+        if variances:
+            ax.plot(rounds, [max(v, 1e-18) for v in variances], label=agg)
+    ax.set_xlabel("runda")
+    ax.set_ylabel(f"varijansa procene (prozor {window})")
+    ax.set_yscale("log")
+    ax.set_title(f"Stabilnost procene kroz vreme (eclipse_resistant, beta={beta})")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "variance_over_time.png"), dpi=130)
+    plt.close(fig)
+
+
+def fig_bucket_histogram(node_rows, beta, out_dir):
+    # 7.4: raspodela peer-ova po bucket-ima u poslednjoj rundi
+    if not node_rows:
+        return
+    last = max(r["round"] for r in node_rows)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    width = 0.25
+    for i, ov in enumerate(OVERLAYS):
+        sel = [r for r in node_rows
+               if r["round"] == last and r["overlay"] == ov and r["beta"] == beta]
+        if not sel:
+            continue
+        counts = Counter(round(r["bucket_occupancy"] * r["peer_count"]) for r in sel)
+        keys = sorted(counts)
+        ax.bar([k + (i - 1) * width for k in keys],
+               [counts[k] / len(sel) for k in keys], width=width, label=ov)
+    svi = sorted({round(r["bucket_occupancy"] * r["peer_count"])
+                  for r in node_rows if r["round"] == last and r["beta"] == beta})
+    ax.set_xticks(svi)
+    ax.set_xlabel("najveci broj peer-ova iz istog bucketa")
+    ax.set_ylabel("udeo cvorova")
+    ax.set_title(f"Raspodela zauzetosti bucket-a (runda {last}, beta={beta})")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(out_dir, "bucket_histogram.png"), dpi=130)
+    plt.close(fig)
+
+
+BETAS = [0.0, 0.1, 0.2, 0.3]
+
+
+def _write(out, lines):
+    with open(out, "a") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _mean(rows, field):
+    values = [r[field] for r in rows]
+    return mean(values) if values else float("nan")
+
+
+def _sel(rows, **conditions):
+    return [r for r in rows
+            if all(r.get(k) == v for k, v in conditions.items())]
+
+
+def table_error_by_beta(summary, out):
+    # 7.1: greska po strategiji, agregaciji i udelu zlonamernih
+    lines = ["## 7.1 Relativna greska po beta", "",
+             "| strategija | agregacija | " + " | ".join(f"b={b}" for b in BETAS) + " |",
+             "|---|---|" + "---|" * len(BETAS)]
+    for overlay in OVERLAYS:
+        for aggregation in AGGS:
+            cells = [f"{_mean(_sel(summary, overlay=overlay, aggregation=aggregation, beta=b), 'final_err_rel'):.4f}"
+                     for b in BETAS]
+            lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_profiles(ablation, out):
+    # 7.2: Byzantine profili vrednosti
+    if not ablation:
+        return
+    profiles = sorted({r["byzantine_profile"] for r in ablation})
+    lines = ["## 7.2 Byzantine profili vrednosti", "",
+             "| profil | " + " | ".join(AGGS) + " |", "|---|" + "---|" * len(AGGS)]
+    for profile in profiles:
+        cells = [f"{_mean(_sel(ablation, byzantine_profile=profile, aggregation=a), 'final_err_rel'):.4f}"
+                 for a in AGGS]
+        lines.append(f"| {profile} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_penetration_by_beta(summary, out):
+    # 7.3: Sybil penetracija po beta
+    lines = ["## 7.3 Sybil penetracija po beta", "",
+             "| strategija | " + " | ".join(f"b={b}" for b in BETAS) + " |",
+             "|---|" + "---|" * len(BETAS)]
+    for overlay in OVERLAYS:
+        cells = [f"{_mean(_sel(summary, overlay=overlay, beta=b), 'final_sybil_penetration'):.4f}"
+                 for b in BETAS]
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_rejection_reasons(summary, beta, out):
+    # 7.3: struktura odbijanja po mehanizmu
+    lines = [f"## 7.3 Struktura odbijanja (beta={beta})", "",
+             "| strategija | PoW | starost | skor | bucket |", "|---|---|---|---|---|"]
+    for overlay in OVERLAYS:
+        rows = _sel(summary, overlay=overlay, beta=beta)
+        cells = [f"{_mean(rows, c):.2f}" for c in ("rej_pow", "rej_age", "rej_score", "rej_bucket")]
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_eclipse(eclipse_summary, out):
+    # 7.4: ciljani Eclipse napad
+    if not eclipse_summary:
+        return
+    betas = sorted({r["beta"] for r in eclipse_summary})
+    lines = ["## 7.4 Ciljani Eclipse napad (eclipse_rate)", "",
+             "| strategija | " + " | ".join(f"b={b}" for b in betas) + " |",
+             "|---|" + "---|" * len(betas)]
+    for overlay in OVERLAYS:
+        cells = [f"{_mean(_sel(eclipse_summary, overlay=overlay, beta=b), 'final_eclipse_rate'):.3f}"
+                 for b in betas]
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_stability(summary, beta, out):
+    # 7.6: varijansa procene u konvergencijskom prozoru
+    lines = [f"## 7.6 Stabilnost procene (beta={beta})", "",
+             "| strategija | " + " | ".join(AGGS) + " |", "|---|" + "---|" * len(AGGS)]
+    for overlay in OVERLAYS:
+        cells = [f"{_mean(_sel(summary, overlay=overlay, aggregation=a, beta=beta), 'stability'):.2e}"
+                 for a in AGGS]
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_diversity(round_rows, out):
+    # 7.7: Shannon entropija u poslednjoj rundi
+    if not round_rows:
+        return
+    last = max(r["round"] for r in round_rows)
+    final = [r for r in round_rows if r["round"] == last]
+    lines = [f"## 7.7 Peer diversity (runda {last})", "",
+             "| strategija | " + " | ".join(f"b={b}" for b in BETAS) + " |",
+             "|---|" + "---|" * len(BETAS)]
+    for overlay in OVERLAYS:
+        cells = [f"{_mean(_sel(final, overlay=overlay, beta=b), 'peer_diversity'):.4f}"
+                 for b in BETAS]
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_overhead(summary, beta, out):
+    # 7.8: cena zastitnih mehanizama
+    lines = [f"## 7.8 Overhead (beta={beta})", "",
+             "| strategija | control | data | udeo odbijenih |", "|---|---|---|---|"]
+    for overlay in OVERLAYS:
+        rows = _sel(summary, overlay=overlay, beta=beta)
+        lines.append(f"| {overlay} | {_mean(rows, 'control_overhead'):.2f} | "
+                     f"{_mean(rows, 'data_overhead'):.2f} | "
+                     f"{_mean(rows, 'rejected_ratio'):.3f} |")
+    _write(out, lines + [""])
+
+
+def table_sweep(rows, column, metrics, title, out):
+    # 7.3/7.6/7.8: dopunske ablacije (flooding, churn, selective)
+    if not rows or column not in rows[0]:
+        return
+    values = sorted({r[column] for r in rows})
+    lines = [f"## {title}", ""]
+    for metric, label in metrics:
+        lines += [f"**{label}**", "",
+                  "| strategija | " + " | ".join(f"{column}={v}" for v in values) + " |",
+                  "|---|" + "---|" * len(values)]
+        for overlay in OVERLAYS:
+            cells = [f"{_mean(_sel(rows, overlay=overlay, **{column: v}), metric):.4f}"
+                     for v in values]
+            lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+        lines.append("")
+    _write(out, lines)
+
+
+def table_statistics(summary, beta, aggregation, out):
+    # 7.10: srednja vrednost, standardna devijacija, minimum i maksimum
+    lines = [f"## 7.10 Statisticka obrada (beta={beta}, {aggregation})", "",
+             "| strategija | srednja | std | min | max |", "|---|---|---|---|---|"]
+    for overlay in OVERLAYS:
+        values = [r["final_err_rel"] for r in
+                  _sel(summary, overlay=overlay, aggregation=aggregation, beta=beta)]
+        if not values:
+            continue
+        lines.append(f"| {overlay} | {mean(values):.4f} | {pstdev(values):.4f} | "
+                     f"{min(values):.4f} | {max(values):.4f} |")
+    _write(out, lines + [""])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     # podrazumevano se izvestaj pravi iz rezultata dobijenih u Docker okruzenju;
@@ -245,6 +490,9 @@ def main() -> None:
     args.ablation = args.ablation or os.path.join(base, "ablation_summary.csv")
     args.tables = args.tables or os.path.join(base, "tables.md")
     args.nodes = args.nodes or os.path.join(base, "eclipse_nodes.csv")
+    eclipse_path = os.path.join(base, "eclipse_summary.csv")
+    sweeps = {name: os.path.join(base, f"{name}_summary.csv")
+              for name in ("flooding", "churn", "selective")}
     if not os.path.exists(args.summary):
         raise SystemExit(
             f"nema rezultata: {args.summary}\n"
@@ -255,8 +503,15 @@ def main() -> None:
     open(args.tables, "w").close()
 
     summary = load(args.summary)
-    table_final_error(summary, args.beta, args.tables)
-    table_penetration(summary, args.tables)
+    ablation = load(args.ablation) if os.path.exists(args.ablation) else []
+    eclipse = load(eclipse_path) if os.path.exists(eclipse_path) else []
+
+    # tabele poglavlja 7, redom kako se u njemu pojavljuju
+    table_error_by_beta(summary, args.tables)
+    table_profiles(ablation, args.tables)
+    table_penetration_by_beta(summary, args.tables)
+    table_rejection_reasons(summary, args.beta, args.tables)
+    table_eclipse(eclipse, args.tables)
     fig_final_error_bars(summary, args.beta, args.figures)
     fig_penetration_vs_beta(summary, args.figures)
     fig_overhead(summary, args.beta, args.figures)
@@ -269,8 +524,37 @@ def main() -> None:
         fig_profiles(load(args.ablation), args.figures)
 
     if os.path.exists(args.nodes):
-        fig_victim_neighborhood(load(args.nodes), 0.4, args.figures)
+        nodes = load(args.nodes)
+        fig_victim_neighborhood(nodes, 0.4, args.figures)
+        fig_bucket_histogram(nodes, 0.4, args.figures)
+    eclipse_round = os.path.join(base, "eclipse.csv")
+    if os.path.exists(eclipse_round):
+        fig_eclipse_over_time(load(eclipse_round), 0.4, args.figures)
     table_convergence(summary, args.beta, args.tables)
+    if os.path.exists(sweeps["selective"]):
+        table_sweep(load(sweeps["selective"]), "unresponsive_p",
+                    [("final_err_rel", "relativna greska"),
+                     ("final_sybil_penetration", "Sybil penetracija")],
+                    "7.5 Selective forwarding", args.tables)
+    table_stability(summary, args.beta, args.tables)
+    if os.path.exists(sweeps["churn"]):
+        table_sweep(load(sweeps["churn"]), "churn_period",
+                    [("final_sybil_penetration", "Sybil penetracija"),
+                     ("final_err_rel", "relativna greska")],
+                    "7.6 Churn napad", args.tables)
+    if os.path.exists(args.round):
+        round_rows = load(args.round)
+        table_diversity(round_rows, args.tables)
+        fig_diversity_over_time(round_rows, args.beta, args.figures)
+        fig_variance_over_time(round_rows, args.beta, 5, args.figures)
+    table_overhead(summary, args.beta, args.tables)
+    if os.path.exists(sweeps["flooding"]):
+        table_sweep(load(sweeps["flooding"]), "flooding",
+                    [("control_overhead", "kontrolni overhead"),
+                     ("rejected_ratio", "udeo odbijenih"),
+                     ("final_sybil_penetration", "Sybil penetracija")],
+                    "7.8 Flooding napad", args.tables)
+    table_statistics(summary, args.beta, "trimmed_mean", args.tables)
     print(f"tables -> {args.tables}")
     print(f"figures -> {args.figures}/")
 
