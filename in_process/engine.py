@@ -30,9 +30,10 @@ class Engine:
                 reasons[k] += v
         return offered, sum(reasons.values()), reasons
 
-    def _broadcast(self, round_now):
-        return round_ops.broadcast_snapshot(self.nodes, self.scenario, round_now,
-                                           trace=self.trace)
+    def _emit(self, round_now):
+        # vrednosti se zamrzavaju pre isporuke (tick barrier)
+        return round_ops.emitted_values(self.nodes, self.scenario, round_now,
+                                        trace=self.trace)
 
     def _heartbeat(self, node, peers, round_now, counter=None):
         return round_ops.heartbeat(node, peers, self.scenario, round_now,
@@ -56,7 +57,7 @@ class Engine:
             counter = messages.MessageCounter()
             offered, rejected, reasons = self._discover(r, counter=counter)
             # na pocetku runce snimak
-            broadcast = self._broadcast(r) # ovde su i napadaci, own samo honest
+            emitted = self._emit(r) # vrednosti svih ucesnika, i napadaca
             own = {hid: n.estimate for hid, n in self.nodes.items()}
 
             data_msgs = 0
@@ -65,8 +66,8 @@ class Engine:
                 peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
                 responders, t = self._heartbeat(node, peers, r, counter=counter)
                 timeouts += t
-                # lazni identiteti (flooding) nemaju emitovanu vrednost
-                incoming = [broadcast[p] for p in responders if p in broadcast]
+                # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru
+                incoming = round_ops.deliver(node, responders, emitted, r)
                 counter.add_all(incoming)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)

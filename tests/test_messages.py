@@ -42,9 +42,41 @@ def test_defense_raises_control_but_not_data():
     assert abs(guarded.data_overhead(20) - plain.data_overhead(20)) < 1e-9
 
 
+def test_value_travels_as_addressed_message():
+    # 5.1.5: agregaciona vrednost se prosledjuje kao poruka od suseda ka cvoru,
+    # sa upisanim izvorom i odredistem
+    from core import round_ops
+
+    class _N:
+        node_id = 3
+        peers = [1, 2]
+
+    emitted = {1: 10.0, 2: 20.0, 9: 99.0}
+    poruke = round_ops.deliver(_N(), [1, 2], emitted, round_now=4)
+    assert len(poruke) == 2
+    for poruka, izvor in zip(poruke, [1, 2]):
+        assert poruka.is_data
+        assert poruka.source == izvor
+        assert poruka.target == 3
+        assert poruka.round == 4
+        assert poruka.payload == emitted[izvor]
+
+
+def test_unknown_peer_sends_nothing():
+    # lazni identiteti (flooding) nemaju emitovanu vrednost pa ne salju poruku
+    from core import round_ops
+
+    class _N:
+        node_id = 0
+        peers = [1, 10001]
+
+    poruke = round_ops.deliver(_N(), [1, 10001], {1: 5.0}, round_now=2)
+    assert len(poruke) == 1 and poruke[0].source == 1
+
+
 def test_all_control_types_are_used():
     from core.setup import build_world
-    from in_process.engine import Engine
+    from core.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics
@@ -70,5 +102,7 @@ if __name__ == "__main__":
     test_control_and_data_are_distinguished()
     test_counter_separates_classes()
     test_defense_raises_control_but_not_data()
+    test_value_travels_as_addressed_message()
+    test_unknown_peer_sends_nothing()
     test_all_control_types_are_used()
     print("OK — razdvajanje control i data saobracaja (5.1.5) prolazi")

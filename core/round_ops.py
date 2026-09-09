@@ -108,17 +108,26 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
     return responders, timeouts
 
 
-def broadcast_snapshot(nodes: Dict[int, object], scenario, round_now: int,
-                       trace=None) -> Dict[int, object]:
+def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
+                   trace=None) -> Dict[int, float]:
+    # 5.1.4: vrednosti svih ucesnika zamrzavaju se na pocetku runde (tick barrier),
+    # pa se tek onda isporucuju. Time isporuka ne zavisi od redosleda obrade cvorova.
     out = {}
     for hid, node in nodes.items():
-        # 5.1.5: emitovana vrednost je data poruka (tip, runda, izvor, payload)
-        out[hid] = messages.data(round_now, hid,
-                                 scenario.broadcast_value(hid, node.estimate, round_now))
+        out[hid] = scenario.broadcast_value(hid, node.estimate, round_now)
     for m in sorted(scenario.malicious_ids): # fiksan redosled radi determinizma
-        # vrati placeholder svakako se ne koristi ta vrednost
-        out[m] = messages.data(round_now, m, scenario.broadcast_value(m, 0.0, round_now))
+        # placeholder 0.0 se ne koristi — napadac vraca vrednost po svom profilu
+        out[m] = scenario.broadcast_value(m, 0.0, round_now)
         if trace is not None and scenario.active(round_now):
-            trace.malicious_broadcast(round_now, m, out[m].payload,
+            trace.malicious_broadcast(round_now, m, out[m],
                                       scenario.params.byzantine_profile)
     return out
+
+
+def deliver(node, responders: List[int], emitted: Dict[int, float],
+            round_now: int) -> List[object]:
+    # 5.1.5: svaka agregaciona vrednost putuje kao zasebna data poruka
+    # od suseda ka ovom cvoru (izvor, odrediste, runda, payload).
+    # Lazni identiteti (flooding) nemaju emitovanu vrednost, pa ne salju nista.
+    return [messages.data(round_now, p, emitted[p], target=node.node_id)
+            for p in responders if p in emitted]

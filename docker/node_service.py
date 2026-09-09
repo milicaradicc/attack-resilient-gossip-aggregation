@@ -119,10 +119,12 @@ def run_honest(base, node_id, cfg, job=None):
         responders, timeouts = round_ops.heartbeat(
             node, list(node.peers), scenario, r, None, timeout_rounds, trace=trace,
             counter=counter)
-        received = [vals[str(p)] for p in responders if str(p) in vals]
-        for p in responders:
-            if str(p) in vals:
-                counter.add(messages.data(r, p, vals[str(p)]))
+        # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru,
+        # istom funkcijom koju koristi i in-process putanja
+        emitted = {int(k): v for k, v in vals.items()}
+        incoming = round_ops.deliver(node, responders, emitted, r)
+        counter.add_all(incoming)
+        received = [m.payload for m in incoming]
         node.estimate = aggregation.aggregate(own, received)
         if trace is not None:
             trace.estimate(r, node_id, node.estimate)
