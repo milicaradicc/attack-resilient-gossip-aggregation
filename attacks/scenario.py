@@ -7,6 +7,7 @@ from typing import Dict, List, Set
 from attacks.base import FLOOD_BASE, AttackContext
 from attacks.byzantine import ByzantineAttack
 from attacks.churn import ChurnAttack
+from attacks.eclipse import EclipseAttack
 from attacks.flooding import PeerFloodingAttack
 from attacks.poisoning import PeerPoisoningAttack
 from attacks.selective import SelectiveForwardingAttack
@@ -22,27 +23,21 @@ class AttackParams:
     random_high: float = 1000.0
     low_bias: float = 5.0
     stale_value: float = 130.0
-
     x_star: float = 100.0
-
     experiment_seed: int = 0 
     activate_round: int = 1
-    
     poison_honest_offers: int = 1
-
     flooding: int = 0
-
     churn_period: int = 0
-
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
-
     eclipse_targets: int = 0 
 
 
 DEFAULT_MODULES = (
     ChurnAttack(),
     PeerPoisoningAttack(),
+    EclipseAttack(),      # suzava ponudu poisoning-a na ciljane zrtve
     PeerFloodingAttack(),
     SelectiveForwardingAttack(),
     ByzantineAttack(),

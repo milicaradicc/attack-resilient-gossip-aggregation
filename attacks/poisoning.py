@@ -11,11 +11,7 @@ class PeerPoisoningAttack(BaseAttack):
 
     def offer_candidates(self, ctx: AttackContext, node, round_now: int,
                          rng: random.Random, offers: List[int]) -> List[int]:
-        targets = ctx.targets()
-        if targets and node.node_id not in targets:
-            malicious = []
-        else:
-            malicious = [m for m in sorted(ctx.malicious_ids) if m not in node.peers]
+        malicious = [m for m in sorted(ctx.malicious_ids) if m not in node.peers]
         # honest kandidati kao "sum", da ponuda ne bude ocigledno zlonamerna
         honest_pool = [h for h in sorted(ctx.honest_ids)
                        if h != node.node_id and h not in node.peers]
