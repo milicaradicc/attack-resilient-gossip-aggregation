@@ -51,6 +51,7 @@ class RunSpec:
     low_bias: float = 5.0
     stale_value: float = 130.0
     eclipse_targets: int = 0
+    delay_rounds: int = 0
     per_node_metrics: bool = False
     trace_events: bool = False
 
@@ -104,12 +105,14 @@ def _spec_fields(c, override=None):
         value_high=c["value_high"], poison_honest_offers=c["poison_honest_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
-        stale_value=c["stale_value"], eclipse_targets=c["eclipse_targets"],
+        stale_value=c["stale_value"], eclipse_targets=c["eclipse_targets"], delay_rounds=c["delay_rounds"],
         per_node_metrics=c["per_node_metrics"], trace_events=c["trace_events"],
     )
 
 
-SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p",
+# parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
+# kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
+SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds",
              "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold")
 
 
@@ -141,6 +144,8 @@ def load_matrix(path: str) -> List[RunSpec]:
 
 
 def spec_from(**overrides) -> RunSpec:
+    # RunSpec od podrazumevanih vrednosti (configs/defaults.json) uz navedene izmene;
+    # koriste ga testovi i distribuirani controller (jedan scenario iz env varijabli)
     fields = _spec_fields(load_defaults())
     fields.update(overrides)
     return RunSpec(**fields)

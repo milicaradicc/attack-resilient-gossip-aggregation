@@ -8,6 +8,7 @@ import urllib.request
 
 from aggregation import get_aggregation
 from attacks.scenario import AttackParams, Scenario
+from attacks.base import NO_MESSAGE
 from core import messages, round_ops
 from metrics.event_trace import EventTrace
 from core.node import Node
@@ -64,6 +65,12 @@ def _block_post(url, obj, poll=0.05):
         time.sleep(poll)
 
 
+def _sendable(value):
+    # zadrzana poruka (delay) salje se kao None, da barijera i dalje broji ovog
+    # ucesnika, a controller je ne isporucuje susedima
+    return None if value is NO_MESSAGE else value
+
+
 def _tag(payload, job):
     if job is not None:
         payload["job"] = job
@@ -111,7 +118,8 @@ def run_honest(base, node_id, cfg, job=None):
 
         own = node.estimate
         _block_post(f"{base}/broadcast", _tag(
-            {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, own, r)}, job))
+            {"node_id": node_id, "round": r,
+             "value": _sendable(scenario.broadcast_value(node_id, own, r))}, job))
         vals = _block_post(f"{base}/values", _tag(
             {"node_id": node_id, "round": r, "peers": node.peers}, job))["values"]
 
@@ -143,7 +151,8 @@ def run_malicious(base, node_id, cfg, job=None):
     _, _, scenario = _build(cfg)
     for r in range(1, cfg["num_rounds"] + 1):
         _block_post(f"{base}/broadcast", _tag(
-            {"node_id": node_id, "round": r, "value": scenario.broadcast_value(node_id, 0.0, r)}, job))
+            {"node_id": node_id, "round": r,
+             "value": _sendable(scenario.broadcast_value(node_id, 0.0, r))}, job))
 
 
 def run_node(base, node_id):

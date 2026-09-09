@@ -131,6 +131,7 @@ def build_world(spec) -> World:
             selective_p=spec.selective_p,
             unresponsive_p=spec.unresponsive_p,
             eclipse_targets=spec.eclipse_targets,
+            delay_rounds=spec.delay_rounds,
         ))
 
     return World(cfg, nodes, honest, byzantine, sybil, registry, id_params, scenario, x_star)

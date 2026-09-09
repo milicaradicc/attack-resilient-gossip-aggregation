@@ -43,11 +43,12 @@
   "churn_period": 0,
   "selective_p": 1.0,
   "unresponsive_p": 0.0,
+  "delay_rounds": 0,
   "eclipse_targets": 0,
   "epsilon": 0.05,
   "conv_window_start": 20,
   "per_node_metrics": true,
-  "trace_events": true,
+  "trace_events": false,
   "docker_port": 8000,
   "docker_compose_out": "docker/docker-compose.yml"
 }

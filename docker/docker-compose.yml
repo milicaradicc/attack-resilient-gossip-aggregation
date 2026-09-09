@@ -6,7 +6,7 @@ services:
     environment:
       ROLE: "controller"
       MODE: "matrix"
-      MATRIX_CONFIG: "configs/selective.json"
+      MATRIX_CONFIG: "configs/smoke.json"
       N_HONEST: "10"
       BETA: "0.0"
       ROUNDS: "50"
@@ -180,61 +180,6 @@ services:
     environment:
       ROLE: node
       NODE_ID: "13"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node14:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "14"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node15:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "15"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node16:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "16"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node17:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "17"
-      MODE: matrix
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node18:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "18"
       MODE: matrix
       CONTROLLER_URL: http://controller:8000
     depends_on:

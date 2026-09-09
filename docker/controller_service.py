@@ -117,6 +117,7 @@ class ControllerState:
                 "selective_p": self.params.selective_p,
                 "unresponsive_p": self.params.unresponsive_p,
                 "eclipse_targets": self.params.eclipse_targets,
+                "delay_rounds": self.params.delay_rounds,
             },
         }
 
@@ -154,7 +155,7 @@ class ControllerState:
             if self.scenario.active(r):
                 sent = self.broadcasts.get(r, {})
                 for m in sorted(self.scenario.malicious_ids):
-                    if m in sent:
+                    if m in sent and sent[m] is not None:
                         self.trace.malicious_broadcast(
                             r, m, sent[m], self.scenario.params.byzantine_profile)
             # dogadjaji stizu od cvorova; redosled je po id-u radi determinizma
@@ -221,7 +222,8 @@ def make_handler(state):
                 with state.lock:
                     ready = len(state.broadcasts.get(r, {})) == state.n_total
                     b = state.broadcasts.get(r, {})
-                    out = {str(p): b[p] for p in data["peers"] if p in b} if ready else None
+                    out = ({str(p): b[p] for p in data["peers"]
+                            if p in b and b[p] is not None} if ready else None)
                 self._send(200 if ready else 425, {"values": out} if ready else {"ready": False})
             elif parts[0] == "report":
                 with state.lock:

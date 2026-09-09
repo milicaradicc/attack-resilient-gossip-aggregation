@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Tuple
 
-from attacks.base import FLOOD_BASE
+from attacks.base import FLOOD_BASE, NO_MESSAGE
 from core import messages
 from identity.observation import Observation
 
@@ -117,9 +117,13 @@ def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
         out[hid] = scenario.broadcast_value(hid, node.estimate, round_now)
     for m in sorted(scenario.malicious_ids): # fiksan redosled radi determinizma
         # placeholder 0.0 se ne koristi — napadac vraca vrednost po svom profilu
-        out[m] = scenario.broadcast_value(m, 0.0, round_now)
+        value = scenario.broadcast_value(m, 0.0, round_now)
+        if value is NO_MESSAGE:
+            # poruka je zadrzana (delay); ovaj ucesnik u ovoj rundi ne salje nista
+            continue
+        out[m] = value
         if trace is not None and scenario.active(round_now):
-            trace.malicious_broadcast(round_now, m, out[m],
+            trace.malicious_broadcast(round_now, m, value,
                                       scenario.params.byzantine_profile)
     return out
 

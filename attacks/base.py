@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Protocol, Set, runtime_checkable
 
 
 FLOOD_BASE = 10_000
+NO_MESSAGE = object()
 
 
 def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Random:
@@ -60,7 +61,7 @@ class BaseAttack:
         return None
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
-        # faza heartbeat: vrati False za cutanje i ignorise poruke ili None ako modul ne odlucuje
+        # faza heartbeat: vrati False za cutanje ili None ako modul ne odlucuje
         return None
 
     def before_round(self, ctx: AttackContext, nodes: Dict[int, object],

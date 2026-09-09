@@ -4,9 +4,10 @@ import random
 from dataclasses import dataclass, field
 from typing import Dict, List, Set
 
-from attacks.base import FLOOD_BASE, AttackContext
+from attacks.base import FLOOD_BASE, NO_MESSAGE, AttackContext
 from attacks.byzantine import ByzantineAttack
 from attacks.churn import ChurnAttack
+from attacks.delay import DelayAttack
 from attacks.eclipse import EclipseAttack
 from attacks.flooding import PeerFloodingAttack
 from attacks.poisoning import PeerPoisoningAttack
@@ -31,17 +32,20 @@ class AttackParams:
     churn_period: int = 0
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
+    delay_rounds: int = 0 
     eclipse_targets: int = 0 
 
 
-DEFAULT_MODULES = (
-    ChurnAttack(),
-    PeerPoisoningAttack(),
-    EclipseAttack(),      # suzava ponudu poisoning-a na ciljane zrtve
-    PeerFloodingAttack(),
-    SelectiveForwardingAttack(),
-    ByzantineAttack(),
-)
+def default_modules() -> tuple:
+    return (
+        ChurnAttack(),
+        PeerPoisoningAttack(),
+        EclipseAttack(),      
+        PeerFloodingAttack(),
+        DelayAttack(),       
+        SelectiveForwardingAttack(),
+        ByzantineAttack(),
+    )
 
 
 @dataclass
@@ -50,7 +54,7 @@ class Scenario:
     byzantine_ids: Set[int]
     sybil_ids: Set[int]
     params: AttackParams = field(default_factory=AttackParams)
-    modules: tuple = DEFAULT_MODULES
+    modules: tuple = field(default_factory=default_modules)
 
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
