@@ -1,9 +1,28 @@
 {
-  "n_honest": [15],
-  "beta": [0.2],
-  "overlay": ["eclipse_resistant"],
-  "aggregation": ["mean", "median", "trimmed_mean"],
-  "byzantine_profile": ["coordinated", "extreme", "random", "low_biased", "stale"],
-  "seeds": [1, 2, 3],
+  "n_honest": [
+    15
+  ],
+  "beta": [
+    0.2
+  ],
+  "overlay": [
+    "eclipse_resistant"
+  ],
+  "aggregation": [
+    "mean",
+    "median",
+    "trimmed_mean"
+  ],
+  "byzantine_profile": [
+    "coordinated",
+    "extreme",
+    "random",
+    "low_biased"
+  ],
+  "seeds": [
+    1,
+    2,
+    3
+  ],
   "activate_round": 1
 }

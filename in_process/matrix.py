@@ -20,6 +20,7 @@ CONFIG_FIELDS = ["n_honest", "beta", "overlay", "aggregation", "byzantine_profil
 SUMMARY_FIELDS = [
     "final_err_rel", # relativna greska agregacije
     "convergence_time", # vreme konvergencije
+    "recovery_time", # prva runda od koje greska trajno ostaje ispod praga
     "stability", # stabilnost procene 
     "data_overhead", # 6.3.8  data overhead
     "control_overhead", # 6.3.7 kontrolni overhead
@@ -36,20 +37,15 @@ SUMMARY_FIELDS = [
 
 
 def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
+    # svet (cvorovi, identiteti, PoW registar, scenario) sklapa se u core/setup.py,
+    # istom funkcijom koju koristi i distribuirani controller
     world = build_world(spec)
 
-    # metrika za merenje rezultata
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets,
                                 per_node=spec.per_node_metrics)
-
-    # sampling strategija
     sampling = get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params)
-
-    # za agregaciju (ako je trimmed prosledjuje se alfa)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
-
-    # random generator
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
 
     engine = Engine(world.nodes, aggregation, sampling, world.scenario, spec.num_rounds,
@@ -64,6 +60,7 @@ def summarize(spec: RunSpec, metrics: ExperimentMetrics) -> List:
     return [
         last.err_rel,
         metrics.convergence_time(spec.epsilon, since=spec.activate_round),
+        metrics.recovery_time(spec.epsilon, since=spec.activate_round),
         metrics.stability(spec.conv_window_start),
         metrics.data_overhead(spec.n_honest),
         metrics.control_overhead(spec.n_honest),
@@ -76,6 +73,8 @@ def summarize(spec: RunSpec, metrics: ExperimentMetrics) -> List:
 
 
 def varying_fields(specs) -> List[str]:
+    # dopunski ablacioni scenariji svipuju i parametre napada; oni koji se menjaju
+    # dodaju se kao kolone da bi se redovi mogli razlikovati
     return [k for k in SWEEPABLE if len({getattr(sp, k) for sp in specs}) > 1]
 
 
@@ -85,23 +84,21 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
     config_fields = CONFIG_FIELDS + extra
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     json_runs = []
-
-    # po cvoru
+    # per-node zapis (4.9) se pise samo kada je trazen u konfiguraciji,
+    # jer nad punom matricom daje red velicine milion redova
     node_path = out_path.replace(".csv", "_nodes.csv") if any(
         sp.per_node_metrics for sp in specs) else None
     f_node = open(node_path, "w", newline="") if node_path else None
     w_node = csv.writer(f_node) if f_node else None
     if w_node:
         w_node.writerow(config_fields + NODE_FIELDS)
-
-    # putanja
+    # 5.1.8: zapis dogadjaja (admission odluke, promene peer set-a, aktivacija napada)
     trace_path = out_path.replace(".csv", "_trace.csv") if any(
         sp.trace_events for sp in specs) else None
     f_trace = open(trace_path, "w", newline="") if trace_path else None
     w_trace = csv.writer(f_trace) if f_trace else None
     if w_trace:
         w_trace.writerow(config_fields + TRACE_FIELDS)
-
     with open(out_path, "w", newline="") as f_round, open(summary_path, "w", newline="") as f_sum:
         w_round = csv.writer(f_round)
         w_sum = csv.writer(f_sum)
@@ -114,7 +111,6 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
             trace = EventTrace() if spec.trace_events else None
             metrics = run_single(spec, trace=trace)
             rows = metrics.to_csv_rows()
-            # upisuje runde
             for row in rows:
                 w_round.writerow(prefix(spec) + row)
             summary = summarize(spec, metrics)
@@ -124,11 +120,9 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
                 "summary": dict(zip(SUMMARY_FIELDS, summary)),
                 "rounds": [dict(zip(FIELDS, row)) for row in rows],
             })
-            # upisuje po cvoru
             if w_node:
                 for row in metrics.node_csv_rows():
                     w_node.writerow(prefix(spec) + row)
-            # putanju
             if w_trace and trace is not None:
                 for row in trace.csv_rows():
                     w_trace.writerow(prefix(spec) + row)
@@ -151,13 +145,13 @@ def main() -> None:
     parser.add_argument("--summary", default=None)
     parser.add_argument("--json", default=None)
     args = parser.parse_args()
+    # podrazumevano: results/inprocess/<ime configa>.csv
     out = args.out or os.path.join(
         "results", "inprocess",
         os.path.splitext(os.path.basename(args.config))[0] + ".csv")
     args.out = out
     summary = args.summary or args.out.replace(".csv", "_summary.csv")
     json_path = args.json or args.out.replace(".csv", ".json")
-    print("evo: ", args.out)
     n = run_matrix(args.config, args.out, summary, json_path)
     print(f"done: {n} runs -> {args.out} , {summary} , {json_path}")
 

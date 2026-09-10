@@ -22,6 +22,4 @@ class ByzantineAttack(BaseAttack):
             return r.uniform(p.random_low, p.random_high)
         if prof == "low_biased":
             return p.x_star + p.low_bias
-        if prof == "stale":
-            return p.stale_value
         return p.coordinated_value

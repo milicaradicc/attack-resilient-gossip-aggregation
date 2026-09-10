@@ -49,7 +49,6 @@ class RunSpec:
     random_low: float = -1000.0
     random_high: float = 1000.0
     low_bias: float = 5.0
-    stale_value: float = 130.0
     eclipse_targets: int = 0
     delay_rounds: int = 0
     per_node_metrics: bool = False
@@ -105,7 +104,7 @@ def _spec_fields(c, override=None):
         value_high=c["value_high"], poison_honest_offers=c["poison_honest_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
-        stale_value=c["stale_value"], eclipse_targets=c["eclipse_targets"], delay_rounds=c["delay_rounds"],
+        eclipse_targets=c["eclipse_targets"], delay_rounds=c["delay_rounds"],
         per_node_metrics=c["per_node_metrics"], trace_events=c["trace_events"],
     )
 
@@ -113,7 +112,7 @@ def _spec_fields(c, override=None):
 # parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
 # kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
 SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds",
-             "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold")
+             "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
 
 
 def _sweep_values(c, key, base):

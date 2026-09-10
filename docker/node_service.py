@@ -103,7 +103,7 @@ def run_honest(base, node_id, cfg, job=None):
     timeout_rounds = cfg["timeout_rounds"]
 
     for r in range(1, cfg["num_rounds"] + 1):
-        scenario.churn_reset({node_id: node}, r)
+        scenario.before_round({node_id: node}, r)
         _block_post(f"{base}/peers", _tag({"node_id": node_id, "round": r, "peers": node.peers}, job))
         opath = f"{base}/offers/{node_id}/{r}" if job is None else f"{base}/offers/{job}/{node_id}/{r}"
         offers = _block_get(opath)["offers"]

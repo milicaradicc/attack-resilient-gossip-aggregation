@@ -37,7 +37,6 @@
   "random_low": -1000.0,
   "random_high": 1000.0,
   "low_bias": 5.0,
-  "stale_value": 130.0,
   "poison_honest_offers": 1,
   "flooding": 0,
   "churn_period": 0,

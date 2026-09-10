@@ -1,0 +1,11 @@
+{
+  "n_honest": [15],
+  "beta": [0.3],
+  "overlay": ["sybil_resistant"],
+  "aggregation": ["trimmed_mean"],
+  "seeds": [1, 2, 3],
+  "age_min": [0, 3, 8],
+  "score_threshold": [0.0, 0.3, 0.5, 0.7],
+  "activate_round": 1,
+  "pow_difficulty_bits": 8
+}

@@ -23,7 +23,6 @@ class AttackParams:
     random_low: float = -1000.0
     random_high: float = 1000.0
     low_bias: float = 5.0
-    stale_value: float = 130.0
     x_star: float = 100.0
     experiment_seed: int = 0 
     activate_round: int = 1

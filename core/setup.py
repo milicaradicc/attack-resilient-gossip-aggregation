@@ -121,7 +121,6 @@ def build_world(spec) -> World:
             random_low=spec.random_low,
             random_high=spec.random_high,
             low_bias=spec.low_bias,
-            stale_value=spec.stale_value,
             poison_honest_offers=spec.poison_honest_offers,
             x_star=x_star,
             experiment_seed=spec.seed, 

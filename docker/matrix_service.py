@@ -10,7 +10,8 @@ from http.server import BaseHTTPRequestHandler
 from docker.controller_service import ControllerState, _Server
 from core.rng import make_rng
 from core.config import RunSpec, load_matrix
-from in_process.matrix import CONFIG_FIELDS, SUMMARY_FIELDS, summarize
+from in_process.matrix import (CONFIG_FIELDS, SUMMARY_FIELDS, summarize,
+                                varying_fields)
 from metrics.event_trace import TRACE_FIELDS
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS
 
@@ -33,6 +34,8 @@ class MatrixState:
         self.trace_rows = {}
         self.lock = threading.Lock()
         self.max_nodes = max(s.n_honest + sum(s.malicious_counts()) for s in self.specs)
+        self.extra = varying_fields(self.specs)
+        self.config_fields = CONFIG_FIELDS + self.extra
 
     def state_for(self, job: int) -> ControllerState:
         with self.lock:
@@ -60,8 +63,9 @@ class MatrixState:
                 return
             self.states[job] = None
         spec = self.specs[job]
-        prefix = [spec.n_honest, spec.beta, spec.overlay, spec.aggregation,
-                  spec.byzantine_profile, spec.seed]
+        prefix = ([spec.n_honest, spec.beta, spec.overlay, spec.aggregation,
+                   spec.byzantine_profile, spec.seed]
+                  + [getattr(spec, k) for k in self.extra])
         summary = summarize(spec, st.metrics)
         self.summaries[job] = (prefix, summary)
         self.round_rows[job] = (prefix, st.metrics.to_csv_rows())
@@ -84,8 +88,8 @@ class MatrixState:
                 open(summary_path, "w", newline="") as f_sum:
             w_round = csv.writer(f_round)
             w_sum = csv.writer(f_sum)
-            w_round.writerow(CONFIG_FIELDS + FIELDS)
-            w_sum.writerow(CONFIG_FIELDS + SUMMARY_FIELDS)
+            w_round.writerow(self.config_fields + FIELDS)
+            w_sum.writerow(self.config_fields + SUMMARY_FIELDS)
             for j in sorted(self.round_rows):
                 prefix, rows = self.round_rows[j]
                 for row in rows:
@@ -98,7 +102,7 @@ class MatrixState:
             prefix, summary = self.summaries[j]
             rows = self.round_rows[j][1]
             runs.append({
-                "config": dict(zip(CONFIG_FIELDS, prefix)),
+                "config": dict(zip(self.config_fields, prefix)),
                 "summary": dict(zip(SUMMARY_FIELDS, summary)),
                 "rounds": [dict(zip(FIELDS, row)) for row in rows],
             })
@@ -109,7 +113,7 @@ class MatrixState:
             trace_path = out_path.replace(".csv", "_trace.csv")
             with open(trace_path, "w", newline="") as f_trace:
                 w_trace = csv.writer(f_trace)
-                w_trace.writerow(CONFIG_FIELDS + TRACE_FIELDS)
+                w_trace.writerow(self.config_fields + TRACE_FIELDS)
                 for j in sorted(self.trace_rows):
                     prefix, rows = self.trace_rows[j]
                     for row in rows:
@@ -118,7 +122,7 @@ class MatrixState:
             node_path = out_path.replace(".csv", "_nodes.csv")
             with open(node_path, "w", newline="") as f_node:
                 w_node = csv.writer(f_node)
-                w_node.writerow(CONFIG_FIELDS + NODE_FIELDS)
+                w_node.writerow(self.config_fields + NODE_FIELDS)
                 for j in sorted(self.node_rows):
                     prefix, rows = self.node_rows[j]
                     for row in rows:
@@ -182,7 +186,9 @@ def make_handler(matrix: MatrixState):
                 with st.lock:
                     ready = len(st.broadcasts.get(r, {})) == st.n_total
                     b = st.broadcasts.get(r, {})
-                    out = {str(p): b[p] for p in data["peers"] if p in b} if ready else None
+                    # zadrzane poruke (delay) imaju vrednost None i ne isporucuju se
+                    out = ({str(p): b[p] for p in data["peers"]
+                            if p in b and b[p] is not None} if ready else None)
                 self._send(200 if ready else 425, {"values": out} if ready else {"ready": False})
             elif parts[0] == "report":
                 with st.lock:

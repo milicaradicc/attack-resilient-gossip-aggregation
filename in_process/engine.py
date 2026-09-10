@@ -5,6 +5,9 @@ from metrics.experiment_metrics import RoundCounters
 
 
 class Engine:
+    # in-process pokretac: hrani zajednicku per-cvor logiku (core/round_ops.py)
+    # podacima iz memorije; distribuirana verzija (docker/node_service.py) hrani
+    # iste te funkcije podacima preko HTTP-a
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
                  timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
@@ -15,12 +18,13 @@ class Engine:
         self.metrics = metrics
         self.rng = rng
         self.timeout_rounds = timeout_rounds
-        self.trace = trace 
+        self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
     def _discover(self, round_now, counter=None):
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
+            # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
                                                      round_now, trace=self.trace,
@@ -46,14 +50,14 @@ class Engine:
 
         for r in range(1, self.num_rounds + 1):
             # churn
-            self.scenario.churn_reset(self.nodes, r)
+            self.scenario.before_round(self.nodes, r)
             if (self.trace is not None and self.scenario.params.churn_period > 0
                     and r > 0 and r % self.scenario.params.churn_period == 0):
                 self.trace.churn_reset(r, len(self.scenario.malicious_ids))
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             # discover + admission
-            # poruke se broje po klasi, iz stvarno poslatih poruka
+            # 5.1.5: poruke se broje po klasi, iz stvarno poslatih poruka
             counter = messages.MessageCounter()
             offered, rejected, reasons = self._discover(r, counter=counter)
             # na pocetku runce snimak
