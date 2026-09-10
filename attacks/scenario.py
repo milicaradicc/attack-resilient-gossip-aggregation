@@ -24,24 +24,31 @@ class AttackParams:
     random_high: float = 1000.0
     low_bias: float = 5.0
     x_star: float = 100.0
-    experiment_seed: int = 0 
+    experiment_seed: int = 0 # 4.10: iz njega se izvode svi izvori randomness-a napada
     activate_round: int = 1
     poison_honest_offers: int = 1
     flooding: int = 0
     churn_period: int = 0
+    churn_offline: int = 1 # koliko rundi po ciklusu napadac izostaje
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
-    delay_rounds: int = 0 
-    eclipse_targets: int = 0 
+    delay_rounds: int = 0 # 0 = iskljuceno; >0 = za koliko rundi napadac kasni
+    eclipse_targets: int = 0 # 0 = napad je „širok" (svi cvorovi); >0 = ciljani Eclipse na N zrtava
 
 
+# 5.1.6: redosled modula je fiksan zbog determinizma. Poisoning nudi napadacke
+# identitete, Eclipse zatim tu ponudu suzava na zrtve, pa flooding dodaje lazne
+# kandidate. Selective ide pre Byzantine, jer selektivno cutanje ima prednost
+# nad profilom vrednosti.
 def default_modules() -> tuple:
+    # nove instance po scenariju: delay modul pamti red poruka, pa se stanje
+    # ne sme deliti izmedju eksperimenata
     return (
         ChurnAttack(),
         PeerPoisoningAttack(),
-        EclipseAttack(),      
+        EclipseAttack(),      # suzava ponudu poisoning-a na ciljane zrtve
         PeerFloodingAttack(),
-        DelayAttack(),       
+        DelayAttack(),        # zadrzava poruku i isporucuje je kasnije
         SelectiveForwardingAttack(),
         ByzantineAttack(),
     )
@@ -49,6 +56,8 @@ def default_modules() -> tuple:
 
 @dataclass
 class Scenario:
+    # Scenario je koordinator: drzi ucesnike i parametre, a same napade
+    # izvrsavaju nezavisni moduli (attacks/*.py) iza zajednickog interfejsa
     honest_ids: Set[int]
     byzantine_ids: Set[int]
     sybil_ids: Set[int]
@@ -112,7 +121,9 @@ class Scenario:
             offers = module.offer_candidates(ctx, node, round_now, rng, offers)
         return offers
 
-    def churn_reset(self, nodes: Dict[int, Node], round_now: int) -> None:
+    def before_round(self, nodes: Dict[int, Node], round_now: int) -> None:
+        # faza pre runde: moduli koji menjaju stanje pre nego sto discovery pocne
+        # (za sada samo churn, koji resetuje starost napadackih identiteta)
         ctx = self.ctx
         for module in self.active_modules():
             module.before_round(ctx, nodes, round_now)

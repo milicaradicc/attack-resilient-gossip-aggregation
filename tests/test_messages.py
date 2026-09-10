@@ -8,7 +8,7 @@ sys.path.insert(0, ROOT)
 
 from core import messages
 from core.config import spec_from
-from in_process.matrix import run_single
+from experiments.matrix import run_single
 
 
 def test_message_has_required_fields():
@@ -25,12 +25,45 @@ def test_control_and_data_are_distinguished():
     assert d.is_data and not d.is_control
 
 
-def test_counter_separates_classes():
-    counter = messages.MessageCounter()
-    counter.add_all([messages.control(messages.PEER_EXCHANGE, 1, 0, 2),
-                     messages.control(messages.PEER_REJECT, 1, 0, 3),
-                     messages.data(1, 2, 10.0)])
-    assert counter.control == 2 and counter.data == 1
+def test_transport_separates_classes():
+    # 5.1.5: transportni sloj broji poruke po klasi
+    from core.transport import Transport
+    t = Transport()
+    t.send_all([messages.control(messages.PEER_EXCHANGE, 1, 0, target=2),
+                     messages.control(messages.PEER_REJECT, 1, 0, target=3),
+                     messages.data(1, 2, 10.0, target=0)])
+    assert t.control == 2 and t.data == 1
+
+
+def test_transport_delivers_to_mailbox():
+    # posiljalac ubacuje, primalac preuzima iz svog sanduceta
+    from core.transport import Transport
+    t = Transport()
+    t.send(messages.data(1, 5, 42.0, target=3))
+    t.send(messages.data(1, 6, 7.0, target=9))
+    for_three = t.receive(3)
+    assert len(for_three) == 1 and for_three[0].source == 5 and for_three[0].payload == 42.0
+    assert t.receive(3) == [], "sanduce se prazni po preuzimanju"
+
+
+def test_transport_filters_by_type():
+    # jedna faza runde preuzima samo svoj tip, ostalo ceka
+    from core.transport import Transport
+    t = Transport()
+    t.send(messages.control(messages.PEER_EXCHANGE, 1, 8, target=0))
+    t.send(messages.data(1, 9, 5.0, target=0))
+    offers = t.receive(0, messages.PEER_EXCHANGE)
+    assert len(offers) == 1 and offers[0].type == messages.PEER_EXCHANGE
+    assert len(t.receive(0, messages.AGGREGATE)) == 1
+
+
+def test_unread_messages_still_counted():
+    # odbijenice poslate napadacima niko ne preuzima, ali se broje
+    from core.transport import Transport
+    t = Transport()
+    t.send(messages.control(messages.PEER_REJECT, 1, 0, target=99, payload="too_young"))
+    assert t.control == 1
+    assert t.undelivered() == 1
 
 
 def test_defense_raises_control_but_not_data():
@@ -100,7 +133,10 @@ def test_all_control_types_are_used():
 if __name__ == "__main__":
     test_message_has_required_fields()
     test_control_and_data_are_distinguished()
-    test_counter_separates_classes()
+    test_transport_separates_classes()
+    test_transport_delivers_to_mailbox()
+    test_transport_filters_by_type()
+    test_unread_messages_still_counted()
     test_defense_raises_control_but_not_data()
     test_value_travels_as_addressed_message()
     test_unknown_peer_sends_nothing()

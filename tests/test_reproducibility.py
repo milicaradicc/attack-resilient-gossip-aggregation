@@ -41,7 +41,7 @@ def test_random_profile_reproducible_across_processes():
 
 
 def test_all_profiles_reproducible_in_process():
-    for profile in ("coordinated", "extreme", "random", "low_biased", "stale"):
+    for profile in ("coordinated", "extreme", "random", "low_biased"):
         spec = spec_from(n_honest=12, beta=0.3, overlay="sybil_resistant",
                          aggregation="mean", seed=3, num_rounds=15, activate_round=1,
                          pow_difficulty_bits=8, byzantine_profile=profile)

@@ -24,7 +24,7 @@ pokretaca koji istu logiku izvrsavaju na dva nacina.
                          |
           +--------------+--------------+
           |                             |
-    experiments/                    docker/
+    in_process/                    docker/
    (in-process, brzo)        (kontejner po cvoru, distribuirano)
 ```
 
@@ -94,15 +94,15 @@ pip install -r requirements.txt
 
 ```bash
 # puna matrica: 3 (N) x 4 (beta) x 3 (overlay) x 3 (agregacija) x 5 (seed) = 540
-python -m experiments.matrix --config configs/main.json
+python -m in_process.matrix --config configs/main.json
 
 # ablacije: sweep Byzantine profila (36 pokretanja)
-python -m experiments.matrix --config configs/ablation.json
+python -m in_process.matrix --config configs/ablation.json
 
 # dopunski overlay napadi (flooding, churn, selective forwarding)
-python -m experiments.matrix --config configs/flooding.json
-python -m experiments.matrix --config configs/churn.json
-python -m experiments.matrix --config configs/selective.json
+python -m in_process.matrix --config configs/flooding.json
+python -m in_process.matrix --config configs/churn.json
+python -m in_process.matrix --config configs/selective.json
 
 # tabele i grafikoni
 python -m analysis.report --beta 0.3                  # iz Docker rezultata
@@ -118,7 +118,7 @@ Izlaz: `results/*.csv` (per-round + run-level summary), `results/*.json`,
 # SVE KONFIGURACIJE redom, pa izvestaj iz Docker rezultata.
 # Prvo pokretanje trazi --build; kasnija ga ne trebaju ako se kod nije menjao.
 # Trajanje: main je 1-3 sata, ostale po nekoliko minuta.
-for cfg in main ablation eclipse flooding churn selective delay; do
+for cfg in main ablation flooding churn selective delay; do
     python -m docker.gen_compose --matrix configs/$cfg.json
     docker compose -f docker/docker-compose.yml up --build
     docker compose -f docker/docker-compose.yml down --remove-orphans
@@ -141,7 +141,7 @@ docker compose -f docker/docker-compose.yml down
 Ista stvar u PowerShell-u (Windows):
 
 ```powershell
-foreach ($cfg in "main","ablation","eclipse","flooding","churn","selective","delay") {
+foreach ($cfg in "main","ablation","flooding","churn","selective","delay") {
     python -m docker.gen_compose --matrix "configs/$cfg.json"
     docker compose -f docker/docker-compose.yml up --build
     docker compose -f docker/docker-compose.yml down --remove-orphans
@@ -176,11 +176,11 @@ configs/main.json       glavna matrica (540)
 configs/ablation.json   sweep Byzantine profila (45)
 configs/smoke.json      brza provera (36)
 configs/tiny.json       minimalna provera (8, koristi je test)
-configs/eclipse.json    ciljani Eclipse napad (27 pokretanja)
 configs/flooding.json   sweep intenziteta flooding napada (36)
-configs/churn.json      sweep churn perioda (36)
+configs/churn.json      sweep duzine odsustva pri churn napadu (45)
 configs/selective.json  sweep selective forwarding i unresponsive (81)
 configs/delay.json      sweep kasnjenja poruka (72)
+configs/admission.json  age_min x score_threshold, doprinos mehanizama (36)
 ```
 
 Glavni parametri: `n_honest {10,15,20}`, `beta {0, 0.1, 0.2, 0.3}`,
@@ -203,6 +203,10 @@ strane pri `K = 7`).
 | `random` | prima svakog (baseline bez zastite) | prvi iz peer set-a |
 | `sybil_resistant` | validan PoW + minimalna starost + skor iznad praga | najnizi skor |
 | `eclipse_resistant` | isto + bucket ogranicenje | najslabiji iz istog bucketa; kad je bucket pun, kandidat sa visim skorom zamenjuje slabijeg (4.5.3) |
+
+Eclipse napad je deo glavnog scenarija: parametar `eclipse_targets` bira zrtve
+kojima se iz ponude uklanjaju honest kandidati, dok ostali cvorovi i dalje
+trpe sirok napad.
 
 **Napadi:** Sybil (masovni identiteti), Eclipse (izolacija cvora; parametar
 `eclipse_targets` prebacuje napad iz "sirokog" u ciljani, gde napadac sve
@@ -236,7 +240,7 @@ sampling/     base, random_strategy, sybil_resistant, eclipse_resistant
 attacks/      base (zajednicki interfejs) + moduli: byzantine, poisoning,
               eclipse, flooding, churn, delay, selective; scenario ih koordinira
 metrics/      experiment_metrics (per-round, per-node, run-level), event_trace (5.1.8)
-experiments/  matrix (pokretanje eksperimentalne matrice)
+in_process/  matrix (pokretanje eksperimentalne matrice)
 docker/       controller_service, node_service, matrix_service,
               entrypoint, gen_compose, Dockerfile
 analysis/     loader, report (tabele + grafikoni)
@@ -258,6 +262,14 @@ zahteva sedam iskljucenja, a kapacitet je sest, pa jedan cvor zadrzava
 prekoracenje.
 k-regularan graf postoji samo kada je N*K paran broj, pa pri N=15 i K=7 jedan
 cvor nuzno ima K-1 suseda i preostaje odstupanje reda 1e-2.
+
+Churn se modeluje kao periodicno napustanje i povratak: napadac tokom odsustva
+ne odgovara na heartbeat i ne emituje vrednost, a po povratku mu se brise
+dnevnik kod svih cvorova. Od pet mehanizama kojima churn destabilizuje mrezu,
+tri (cepanje topologije, gubitak parcijalnog stanja, zastoj konvergencije zbog
+nestanka nosilaca stanja) vezani su za promenljiv broj ucesnika, sto model sa
+fiksnim skupom cvorova ne podrzava; modeluju se preostala dva — rast kontrolnog
+saobracaja i pokusaj zaobilazenja reputacionog mehanizma.
 
 Model je sinhron (tick-barrier), bez asinhrone mreze i realnog rutiranja.
 Bucket diverzifikacija je eksperimentalna aproksimacija realne IP/ASN

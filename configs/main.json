@@ -1,9 +1,34 @@
 {
-  "n_honest": [10, 15, 20],
-  "beta": [0.0, 0.1, 0.2, 0.3],
-  "overlay": ["random", "sybil_resistant", "eclipse_resistant"],
-  "aggregation": ["mean", "median", "trimmed_mean"],
-  "seeds": [1, 2, 3, 4, 5],
+  "n_honest": [
+    10,
+    15,
+    20
+  ],
+  "beta": [
+    0.0,
+    0.1,
+    0.2,
+    0.3
+  ],
+  "overlay": [
+    "random",
+    "sybil_resistant",
+    "eclipse_resistant"
+  ],
+  "aggregation": [
+    "mean",
+    "median",
+    "trimmed_mean"
+  ],
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
   "warmup": 10,
-  "conv_window_start": 20
+  "conv_window_start": 20,
+  "eclipse_targets": 1,
+  "per_node_metrics": true
 }

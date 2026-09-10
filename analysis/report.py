@@ -1110,8 +1110,8 @@ def main() -> None:
     args.summary = args.summary or os.path.join(base, "main_summary.csv")
     args.ablation = args.ablation or os.path.join(base, "ablation_summary.csv")
     args.tables = args.tables or os.path.join(base, "tables.md")
-    args.nodes = args.nodes or os.path.join(base, "eclipse_nodes.csv")
-    eclipse_path = os.path.join(base, "eclipse_summary.csv")
+    args.nodes = args.nodes or os.path.join(base, "main_nodes.csv")
+    eclipse_path = args.summary
     sweeps = {name: os.path.join(base, f"{name}_summary.csv")
               for name in ("flooding", "churn", "selective", "delay", "admission")}
     if not os.path.exists(args.summary):
@@ -1146,7 +1146,7 @@ def main() -> None:
                     "7.3 Uticaj peer flooding scenarija", args.tables)
     table_eclipse(eclipse, args.tables)
     # 7.4: broj izolovanih cvorova, degradacija peer set-a i raspodela po bucket-ima
-    table_eclipse_counts_guard(args.nodes, args.tables, 0.4)
+    table_eclipse_counts_guard(args.nodes, args.tables, args.beta)
     fig_final_error_bars(summary, args.beta, args.figures)
     fig_penetration_vs_beta(summary, args.figures)
     fig_overhead(summary, args.beta, args.figures)
@@ -1160,13 +1160,12 @@ def main() -> None:
 
     if os.path.exists(args.nodes):
         nodes = load(args.nodes)
-        fig_victim_neighborhood(nodes, 0.4, args.figures)
-        fig_bucket_histogram(nodes, 0.4, args.figures)
-        table_compromise_distribution(nodes, 0.4, args.tables)
-        table_diversity_vs_eclipse(nodes, 0.4, args.tables)
-    eclipse_round = os.path.join(base, "eclipse.csv")
-    if os.path.exists(eclipse_round):
-        fig_eclipse_over_time(load(eclipse_round), 0.4, args.figures)
+        fig_victim_neighborhood(nodes, args.beta, args.figures)
+        fig_bucket_histogram(nodes, args.beta, args.figures)
+        table_compromise_distribution(nodes, args.beta, args.tables)
+        table_diversity_vs_eclipse(nodes, args.beta, args.tables)
+    if os.path.exists(args.round):
+        fig_eclipse_over_time(load(args.round), args.beta, args.figures)
     table_convergence(summary, args.beta, args.tables)
     table_recovery(summary, args.beta, args.tables)
     table_convergence_stats(summary, args.beta, args.tables)

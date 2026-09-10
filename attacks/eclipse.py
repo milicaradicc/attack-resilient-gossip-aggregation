@@ -14,9 +14,8 @@ class EclipseAttack(BaseAttack):
 
     def offer_candidates(self, ctx: AttackContext, node, round_now: int,
                          rng: random.Random, offers: List[int]) -> List[int]:
-        targets = ctx.targets()
-        if not targets or node.node_id in targets:
+        if node.node_id not in ctx.targets():
             return offers
-        # cvor nije meta: napadacki identiteti mu se ne nude, ostaju samo
-        # honest kandidati koje je poisoning dodao kao "sum"
-        return [o for o in offers if o not in ctx.malicious_ids]
+        # zrtvi se nude samo napadacki identiteti: honest kandidati bi joj
+        # popunili mesto koje napadac cilja, pa se iz ponude izostavljaju
+        return [o for o in offers if o in ctx.malicious_ids]

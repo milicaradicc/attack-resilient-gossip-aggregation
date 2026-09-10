@@ -30,16 +30,16 @@ def observe(node, other: int, round_now: int, exchanged: bool) -> None:
 
 
 def admit(node, offered: List[int], sampling, round_now: int,
-          trace=None, counter=None) -> Tuple[int, int, Dict[str, int]]:
+          trace=None, transport=None) -> Tuple[int, int, Dict[str, int]]:
     reasons = empty_reasons()
     if trace is not None:
         flooded = sum(1 for c in offered if c >= FLOOD_BASE)
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
     for candidate in offered:
-        if counter is not None:
-            counter.add(messages.control(messages.PEER_EXCHANGE, round_now,
-                                         node.node_id, candidate))
+        if transport is not None:
+            transport.send(messages.control(messages.PEER_EXCHANGE, round_now,
+                                               candidate, target=node.node_id))
         # zabelezi u dnevnik (vidjanje, ne razmena) -> time mu starost pocinje da tece
         observe(node, candidate, round_now, exchanged=False)
         # ako je kandidat vec komsija skip
@@ -60,30 +60,33 @@ def admit(node, offered: List[int], sampling, round_now: int,
                     trace.reject(round_now, node.node_id, candidate, "peer_set_full")
                 continue
             node.peers.append(candidate)
-            if counter is not None:
-                counter.add(messages.control(messages.ADMISSION, round_now,
-                                             node.node_id, candidate))
+            if transport is not None:
+                transport.send(messages.control(messages.ADMISSION, round_now,
+                                                   node.node_id, target=candidate))
             if trace is not None:
                 trace.accept(round_now, node.node_id, candidate)
         else:
             # povecaj brojace
             why = sampling.reason(node, candidate, round_now) or "self_or_duplicate"
             reasons[why] = reasons.get(why, 0) + 1
-            if counter is not None:
-                counter.add(messages.control(messages.PEER_REJECT, round_now,
-                                             node.node_id, candidate, why))
+            if transport is not None:
+                transport.send(messages.control(messages.PEER_REJECT, round_now,
+                                                   node.node_id, target=candidate,
+                                                   payload=why))
             if trace is not None:
                 trace.reject(round_now, node.node_id, candidate, why)
     return len(offered), sum(reasons.values()), reasons
 
 
 def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
-              timeout_rounds: int, trace=None, counter=None) -> Tuple[List[int], int]:
+              timeout_rounds: int, trace=None, transport=None) -> Tuple[List[int], int]:
     # ko odgovara ostaje u razmeni, ko cuti skuplja propustene otkucaje
     responders = []
     for p in peers:
-        if counter is not None:
-            counter.add(messages.control(messages.HEARTBEAT, round_now, node.node_id, p))
+        # 5.1.5: heartbeat je control poruka ka susedu
+        if transport is not None:
+            transport.send(messages.control(messages.HEARTBEAT, round_now,
+                                               node.node_id, target=p))
         if scenario.responds(p, round_now, rng):
             observe(node, p, round_now, exchanged=True)
             responders.append(p)
@@ -129,9 +132,12 @@ def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
 
 
 def deliver(node, responders: List[int], emitted: Dict[int, float],
-            round_now: int) -> List[object]:
+            round_now: int, transport=None) -> List[object]:
     # 5.1.5: svaka agregaciona vrednost putuje kao zasebna data poruka
     # od suseda ka ovom cvoru (izvor, odrediste, runda, payload).
     # Lazni identiteti (flooding) nemaju emitovanu vrednost, pa ne salju nista.
-    return [messages.data(round_now, p, emitted[p], target=node.node_id)
-            for p in responders if p in emitted]
+    outgoing = [messages.data(round_now, p, emitted[p], target=node.node_id)
+              for p in responders if p in emitted]
+    if transport is not None:
+        transport.send_all(outgoing)
+    return outgoing

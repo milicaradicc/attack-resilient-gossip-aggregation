@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from core import messages, round_ops
+from core.transport import Transport
 from metrics.experiment_metrics import RoundCounters
 
 
@@ -20,7 +21,7 @@ class Engine:
         self.timeout_rounds = timeout_rounds
         self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
-    def _discover(self, round_now, counter=None):
+    def _discover(self, round_now, transport=None):
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
@@ -28,7 +29,7 @@ class Engine:
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
                                                      round_now, trace=self.trace,
-                                                     counter=counter)
+                                                     transport=transport)
             offered += n_off
             for k, v in node_reasons.items():
                 reasons[k] += v
@@ -39,10 +40,10 @@ class Engine:
         return round_ops.emitted_values(self.nodes, self.scenario, round_now,
                                         trace=self.trace)
 
-    def _heartbeat(self, node, peers, round_now, counter=None):
+    def _heartbeat(self, node, peers, round_now, transport=None):
         return round_ops.heartbeat(node, peers, self.scenario, round_now,
                                    self.rng, self.timeout_rounds, trace=self.trace,
-                                   counter=counter)
+                                   transport=transport)
 
     def run(self):
         # sacuvaj prvu rundu
@@ -57,9 +58,9 @@ class Engine:
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             # discover + admission
-            # 5.1.5: poruke se broje po klasi, iz stvarno poslatih poruka
-            counter = messages.MessageCounter()
-            offered, rejected, reasons = self._discover(r, counter=counter)
+            # 5.1.5: sve poruke runde prolaze kroz transportni sloj
+            transport = Transport()
+            offered, rejected, reasons = self._discover(r, transport=transport)
             # na pocetku runce snimak
             emitted = self._emit(r) # vrednosti svih ucesnika, i napadaca
             own = {hid: n.estimate for hid, n in self.nodes.items()}
@@ -68,11 +69,12 @@ class Engine:
             timeouts = 0
             for hid, node in self.nodes.items():
                 peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
-                responders, t = self._heartbeat(node, peers, r, counter=counter)
+                responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
-                # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru
-                incoming = round_ops.deliver(node, responders, emitted, r)
-                counter.add_all(incoming)
+                # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru;
+                # primalac je preuzima iz sanduceta i iz nje vadi vrednost
+                round_ops.deliver(node, responders, emitted, r, transport=transport)
+                incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)
                 node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
@@ -80,7 +82,7 @@ class Engine:
                     self.trace.estimate(r, hid, node.estimate)
 
             counters = RoundCounters(
-                data_msgs=counter.data, control_msgs=counter.control,
+                data_msgs=transport.data, control_msgs=transport.control,
                 offered=offered, rejected=rejected,
                 rej_invalid_pow=reasons["invalid_pow"], rej_too_young=reasons["too_young"],
                 rej_low_score=reasons["low_score"], rej_bucket_full=reasons["bucket_full"],

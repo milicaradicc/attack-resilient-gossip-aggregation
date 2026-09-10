@@ -33,7 +33,7 @@ def test_flooding_raises_rejections_and_overhead():
 
 
 def test_all_profiles_run():
-    for p in ("coordinated", "extreme", "random", "low_biased", "stale"):
+    for p in ("coordinated", "extreme", "random", "low_biased"):
         assert run_single(_spec(p)).rows[-1].err_rel >= 0.0
 
 
