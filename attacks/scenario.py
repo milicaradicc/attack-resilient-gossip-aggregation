@@ -26,7 +26,7 @@ class AttackParams:
     x_star: float = 100.0
     experiment_seed: int = 0 # 4.10: iz njega se izvode svi izvori randomness-a napada
     activate_round: int = 1
-    poison_honest_offers: int = 1
+    discovery_offers: int = 2 # honest kandidata po rundi, i bez napada
     flooding: int = 0
     churn_period: int = 0
     churn_offline: int = 1 # koliko rundi po ciklusu napadac izostaje
@@ -67,7 +67,7 @@ class Scenario:
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
         return cls(set(honest_ids), set(), set(),
-                   AttackParams(activate_round=10 ** 9, poison_honest_offers=0))
+                   AttackParams(activate_round=10 ** 9))
 
     @property
     def malicious_ids(self) -> Set[int]:
@@ -113,13 +113,28 @@ class Scenario:
         return honest_value
 
     def offer_candidates(self, node: Node, round_now: int, rng: random.Random) -> List[int]:
-        if not self.active(round_now):
-            return []
+        # Peer sampling radi neprekidno, i kada napada nema: cvoru se u svakoj
+        # rundi predlaze nekoliko honest kandidata. Nad tom osnovom napadacki
+        # moduli zatim dodaju sopstvene identitete ili menjaju ponudu.
         ctx = self.ctx
-        offers: List[int] = []
+        offers = self._discovery(node, rng)
+        if not self.active(round_now):
+            return offers
         for module in self.active_modules():
             offers = module.offer_candidates(ctx, node, round_now, rng, offers)
+        # redosled u ponudi ne sme da daje prednost: kandidat primljen poslednji
+        # ostaje u peer set-u jer ga nijedan naredni vise ne istiskuje
+        rng.shuffle(offers)
         return offers
+
+    def _discovery(self, node: Node, rng: random.Random) -> List[int]:
+        broj = self.params.discovery_offers
+        if broj <= 0:
+            return []
+        pool = [h for h in sorted(self.honest_ids)
+                if h != node.node_id and h not in node.peers]
+        rng.shuffle(pool)
+        return pool[:broj]
 
     def before_round(self, nodes: Dict[int, Node], round_now: int) -> None:
         # faza pre runde: moduli koji menjaju stanje pre nego sto discovery pocne

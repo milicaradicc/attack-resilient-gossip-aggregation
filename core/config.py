@@ -44,13 +44,14 @@ class RunSpec:
     max_per_bucket: int = 2
     value_low: float = 50.0
     value_high: float = 150.0
-    poison_honest_offers: int = 1
+    discovery_offers: int = 2
     extreme_offset: float = 1000.0
     random_low: float = -1000.0
     random_high: float = 1000.0
     low_bias: float = 5.0
     eclipse_targets: int = 0
     delay_rounds: int = 0
+    churn_offline: int = 1
     per_node_metrics: bool = False
     trace_events: bool = False
 
@@ -101,17 +102,17 @@ def _spec_fields(c, override=None):
         trim_alpha=c["trim_alpha"], age_min=c["age_min"], age_max=c["age_max"],
         exchange_max=c["exchange_max"], score_threshold=c["score_threshold"],
         max_per_bucket=c["max_per_bucket"], value_low=c["value_low"],
-        value_high=c["value_high"], poison_honest_offers=c["poison_honest_offers"],
+        value_high=c["value_high"], discovery_offers=c["discovery_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
-        eclipse_targets=c["eclipse_targets"], delay_rounds=c["delay_rounds"],
+        eclipse_targets=c["eclipse_targets"], delay_rounds=c["delay_rounds"], churn_offline=c["churn_offline"],
         per_node_metrics=c["per_node_metrics"], trace_events=c["trace_events"],
     )
 
 
 # parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
 # kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
-SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds",
+SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds", "churn_offline", "discovery_offers",
              "eclipse_targets", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
 
 

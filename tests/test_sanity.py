@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import spec_from
-from in_process.matrix import run_single
+from experiments.matrix import run_single
 
 # 5.2.8. Sanity check scenariji napada
 # Pre pune eksperimentalne matrice proveravaju se najjednostavniji scenariji sa
@@ -31,7 +31,9 @@ def test_single_sybil_node():
                          byzantine_fraction=0.0)
     metrics = run_single(spec)
     assert sum(spec.malicious_counts()) == 1
-    assert metrics.rows[-1].sybil_penetration > 0.0
+    # peer sampling radi neprekidno, pa napadac ulazi i izlazi iz peer set-ova;
+    # meri se da li je uopste probio, a ne stanje u poslednjoj rundi
+    assert max(r.sybil_penetration for r in metrics.rows) > 0.0
 
 
 def test_single_byzantine_outlier():
@@ -50,7 +52,7 @@ def test_single_eclipse_attempt():
     # sa bucket diverzifikacijom ih zadrzava
     common = dict(n_honest=20, beta=0.4, aggregation="trimmed_mean", seed=1,
                   num_rounds=50, activate_round=1, pow_difficulty_bits=8,
-                  eclipse_targets=1, poison_honest_offers=0)
+                  eclipse_targets=1, discovery_offers=0)
     plain = run_single(spec_from(overlay="random", **common))
     guarded = run_single(spec_from(overlay="eclipse_resistant", **common))
     assert plain.rows[-1].eclipse_rate > 0.0
@@ -58,12 +60,36 @@ def test_single_eclipse_attempt():
 
 
 def test_single_churn_peer():
-    # churn resetuje starost napadaca; uz age-gating to mu otezava ulazak,
-    # pa penetracija ne sme biti veca nego bez churn-a
-    base = dict(overlay="sybil_resistant", aggregation="mean", **MINIMAL)
-    without = run_single(spec_from(beta=1 / 13, churn_period=0, **base))
-    with_churn = run_single(spec_from(beta=1 / 13, churn_period=3, **base))
-    assert with_churn.rows[-1].sybil_penetration <= without.rows[-1].sybil_penetration
+    # 3.8: churn kao napustanje mreze — napadac tokom odsustva ne odgovara i ne
+    # emituje, a po povratku mu se brise dnevnik kod svih cvorova
+    from core.setup import build_world
+    spec = _one_attacker(overlay="sybil_resistant", aggregation="mean",
+                         churn_period=4, churn_offline=1)
+    world = build_world(spec)
+    napadac = sorted(world.byzantine | world.sybil)[0]
+    odsutan = [r for r in range(1, 9) if not world.scenario.responds(napadac, r, None)]
+    assert odsutan, "napadac mora izostati bar jednu rundu"
+    assert all(r % 4 == 0 for r in odsutan), "izostanak prati zadati ciklus"
+    metrics = run_single(spec)
+    assert metrics.rows[-1].sybil_penetration <= 0.2
+
+
+def test_churn_clears_observation_log():
+    # po povratku identitet krece cist: starost, razmene i kazna se brisu
+    from core.setup import build_world
+    from core import round_ops
+    spec = _one_attacker(overlay="sybil_resistant", aggregation="mean",
+                         churn_period=4, churn_offline=1)
+    world = build_world(spec)
+    napadac = sorted(world.byzantine | world.sybil)[0]
+    cvor = world.nodes[0]
+    round_ops.observe(cvor, napadac, 1, exchanged=True)
+    cvor.observations[napadac].missed_total = 5
+    world.scenario.before_round(world.nodes, 5)
+    obs = cvor.observations[napadac]
+    assert obs.first_seen_round == 5
+    assert obs.successful_exchanges == 0
+    assert obs.missed_total == 0
 
 
 def test_random_overlay_shows_higher_penetration():
@@ -89,6 +115,7 @@ if __name__ == "__main__":
     test_single_byzantine_outlier()
     test_single_eclipse_attempt()
     test_single_churn_peer()
+    test_churn_clears_observation_log()
     test_random_overlay_shows_higher_penetration()
     test_eclipse_overlay_keeps_higher_diversity()
     print("OK — sanity check scenariji napada (5.2.8) prolaze")

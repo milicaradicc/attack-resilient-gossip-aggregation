@@ -12,7 +12,6 @@ class Node:
     x_local: float
     estimate: float = field(default=0.0) # lokalna agregaciona procena 
     peers: List[int] = field(default_factory=list) # lokalni peer set
-    nonce: int = 0
     observations: Dict[int, Observation] = field(default_factory=dict) # observation log
 
     @classmethod

@@ -12,8 +12,4 @@ class PeerPoisoningAttack(BaseAttack):
     def offer_candidates(self, ctx: AttackContext, node, round_now: int,
                          rng: random.Random, offers: List[int]) -> List[int]:
         malicious = [m for m in sorted(ctx.malicious_ids) if m not in node.peers]
-        # honest kandidati kao "sum", da ponuda ne bude ocigledno zlonamerna
-        honest_pool = [h for h in sorted(ctx.honest_ids)
-                       if h != node.node_id and h not in node.peers]
-        rng.shuffle(honest_pool)
-        return offers + malicious + honest_pool[: ctx.params.poison_honest_offers]
+        return offers + malicious

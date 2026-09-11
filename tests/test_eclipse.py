@@ -7,14 +7,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import spec_from
-from in_process.matrix import run_single
+from experiments.matrix import run_single
 
 
 def _spec(overlay, beta=0.4, targets=1):
     # ciljani Eclipse: napadac koncentrise sve identitete na jednu zrtvu
     return spec_from(n_honest=20, beta=beta, overlay=overlay, aggregation="trimmed_mean",
                      seed=1, num_rounds=50, activate_round=1, pow_difficulty_bits=8,
-                     eclipse_targets=targets, poison_honest_offers=0)
+                     eclipse_targets=targets, discovery_offers=0)
 
 
 def test_targets_are_deterministic():
