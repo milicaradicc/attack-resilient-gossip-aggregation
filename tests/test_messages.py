@@ -8,7 +8,7 @@ sys.path.insert(0, ROOT)
 
 from core import messages
 from core.config import spec_from
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 
 def test_message_has_required_fields():
@@ -29,9 +29,9 @@ def test_transport_separates_classes():
     # 5.1.5: transportni sloj broji poruke po klasi
     from core.transport import Transport
     t = Transport()
-    t.send_all([messages.control(messages.PEER_EXCHANGE, 1, 0, target=2),
-                     messages.control(messages.PEER_REJECT, 1, 0, target=3),
-                     messages.data(1, 2, 10.0, target=0)])
+    t.offer(1, 0, 2)
+    t.reject(1, 0, 3, "too_young")
+    t.send_value(1, 2, 0, 10.0)
     assert t.control == 2 and t.data == 1
 
 
@@ -79,13 +79,16 @@ def test_value_travels_as_addressed_message():
     # 5.1.5: agregaciona vrednost se prosledjuje kao poruka od suseda ka cvoru,
     # sa upisanim izvorom i odredistem
     from core import round_ops
+    from core.transport import Transport
 
     class _N:
         node_id = 3
         peers = [1, 2]
 
+    t = Transport()
     emitted = {1: 10.0, 2: 20.0, 9: 99.0}
-    poruke = round_ops.deliver(_N(), [1, 2], emitted, round_now=4)
+    round_ops.deliver(_N(), [1, 2], emitted, round_now=4, transport=t)
+    poruke = t.receive(3, messages.AGGREGATE)
     assert len(poruke) == 2
     for poruka, izvor in zip(poruke, [1, 2]):
         assert poruka.is_data
@@ -98,18 +101,58 @@ def test_value_travels_as_addressed_message():
 def test_unknown_peer_sends_nothing():
     # lazni identiteti (flooding) nemaju emitovanu vrednost pa ne salju poruku
     from core import round_ops
+    from core.transport import Transport
 
     class _N:
         node_id = 0
         peers = [1, 10001]
 
-    poruke = round_ops.deliver(_N(), [1, 10001], {1: 5.0}, round_now=2)
+    t = Transport()
+    round_ops.deliver(_N(), [1, 10001], {1: 5.0}, round_now=2, transport=t)
+    poruke = t.receive(0, messages.AGGREGATE)
     assert len(poruke) == 1 and poruke[0].source == 1
+
+
+def test_named_actions_produce_expected_types():
+    # radnje protokola su imenovane, a svaka pravi poruku svog tipa
+    from core.transport import Transport
+    t = Transport()
+    t.offer(1, 8, 0)
+    t.accept(1, 0, 8)
+    t.reject(1, 0, 9, "low_score")
+    t.evict(1, 0, 7, "timeout")
+    t.probe(1, 0, 2)
+    t.send_value(1, 2, 0, 3.5)
+    assert t.count(messages.PEER_EXCHANGE) == 1
+    assert t.count(messages.ADMISSION) == 1
+    assert t.count(messages.PEER_REJECT) == 1
+    assert t.count(messages.PEER_EVICT) == 1
+    assert t.count(messages.HEARTBEAT) == 1
+    assert t.count(messages.AGGREGATE) == 1
+    assert t.control == 5 and t.data == 1
+
+
+def test_discovery_is_request_and_response():
+    # 5.1.5: cvor salje zahtev za kandidate, a ponude stizu kao zasebne poruke
+    # od identiteta koji se reklamira; admit ih preuzima iz sanduceta
+    from core import round_ops
+    from core.transport import Transport
+
+    class _N:
+        node_id = 0
+        peers = []
+
+    t = Transport()
+    round_ops.request_peers(_N(), [5, 9], round_now=3, transport=t)
+    assert t.count(messages.PEER_REQUEST) == 1, "zahtev je jedna poruka"
+    ponude = t.receive(0, messages.PEER_EXCHANGE)
+    assert [m.source for m in ponude] == [5, 9], "izvor je identitet koji se nudi"
+    assert all(m.target == 0 and m.round == 3 for m in ponude)
 
 
 def test_all_control_types_are_used():
     from core.setup import build_world
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics
@@ -140,5 +183,7 @@ if __name__ == "__main__":
     test_defense_raises_control_but_not_data()
     test_value_travels_as_addressed_message()
     test_unknown_peer_sends_nothing()
+    test_named_actions_produce_expected_types()
+    test_discovery_is_request_and_response()
     test_all_control_types_are_used()
     print("OK — razdvajanje control i data saobracaja (5.1.5) prolazi")

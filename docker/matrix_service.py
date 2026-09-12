@@ -25,20 +25,22 @@ def _spec_state(spec: RunSpec) -> ControllerState:
 
 class MatrixState:
     def __init__(self, config_path: str, verbose: bool = True):
-        self.specs = load_matrix(config_path)
+        self.specs = load_matrix(config_path) # 540 eksp
         self.verbose = verbose
         self.states = {}
+
         self.summaries = {}
         self.round_rows = {}
         self.node_rows = {}
         self.trace_rows = {}
+
         self.lock = threading.Lock()
-        self.max_nodes = max(s.n_honest + sum(s.malicious_counts()) for s in self.specs)
-        self.extra = varying_fields(self.specs)
+        self.max_nodes = max(s.n_honest + sum(s.malicious_counts()) for s in self.specs) # za kontejnere
+        self.extra = varying_fields(self.specs) # za ablaciju
         self.config_fields = CONFIG_FIELDS + self.extra
 
     def state_for(self, job: int) -> ControllerState:
-        with self.lock:
+        with self.lock: # da se ne napravi vise statea
             st = self.states.get(job)
             if st is None:
                 st = _spec_state(self.specs[job])
@@ -46,7 +48,7 @@ class MatrixState:
             return st
 
     def job_payload(self, job: int):
-        spec = self.specs[job]
+        # job payload = konfiguracija + redni broj posla + ukupan br + koliko ucesnika
         st = self.state_for(job)
         payload = st.config_payload()
         payload["job"] = job

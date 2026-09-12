@@ -8,10 +8,12 @@ CONTROL = "control"
 DATA = "data"
 
 # tipovi control poruka
+PEER_REQUEST = "peer_request"     # zahtev za nove kandidate
 PEER_EXCHANGE = "peer_exchange"   # ponuda kandidata kroz discovery
 ADMISSION = "admission"           # provera i prihvatanje kandidata
 PEER_REJECT = "peer_reject"       # odbijanje kandidata
 HEARTBEAT = "heartbeat"           # provera aktivnosti peer-a
+PEER_EVICT = "peer_evict"         # obavestenje o uklanjanju iz peer set-a
 
 # tip data poruke
 AGGREGATE = "aggregate"           # agregaciona vrednost
@@ -42,20 +44,3 @@ def control(msg_type: str, round_now: int, source: int,
 
 def data(round_now: int, source: int, value: float, target: int = None) -> Message:
     return Message(DATA, AGGREGATE, round_now, source, value, target)
-
-
-@dataclass
-class MessageCounter:
-    # broji stvarne poruke po klasi, umesto da se overhead racuna formulom
-    control: int = 0
-    data: int = 0
-
-    def add(self, message: Message) -> None:
-        if message.is_control:
-            self.control += 1
-        else:
-            self.data += 1
-
-    def add_all(self, messages) -> None:
-        for message in messages:
-            self.add(message)

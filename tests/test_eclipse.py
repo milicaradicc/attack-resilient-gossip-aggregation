@@ -7,7 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import spec_from
-from experiments.matrix import run_single
+from in_process.matrix import run_single
 
 
 def _spec(overlay, beta=0.4, targets=1):

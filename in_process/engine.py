@@ -24,11 +24,15 @@ class Engine:
     def _discover(self, round_now, transport=None):
         offered = 0
         reasons = round_ops.empty_reasons()
+        # 5.1.5: discovery je razmena — prvo svi cvorovi posalju zahtev i prime
+        # ponude, pa tek onda svi odlucuju. Time isporuka ponuda ne zavisi od
+        # redosleda obrade, isto kao kod vrednosti.
         for node in self.nodes.values():
-            # za svaki cvor, scenario ponudi kandidate (napadaci se guraju)
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
-            n_off, _, node_reasons = round_ops.admit(node, candidates, self.sampling,
-                                                     round_now, trace=self.trace,
+            round_ops.request_peers(node, candidates, round_now, transport=transport)
+        for node in self.nodes.values():
+            n_off, _, node_reasons = round_ops.admit(node, self.sampling, round_now,
+                                                     trace=self.trace,
                                                      transport=transport)
             offered += n_off
             for k, v in node_reasons.items():

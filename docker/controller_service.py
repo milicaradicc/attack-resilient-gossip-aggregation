@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import json
-import os
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from core.rng import make_rng
 from core.setup import build_world
-from core.config import load_defaults, spec_from
 from metrics.event_trace import EventTrace
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
+
+
+# Stanje jedne konfiguracije: sklapa svet, drzi sinhronu barijeru i belezi
+# metrike. Matricna sluzba (docker/matrix_service.py) drzi po jedan primerak za
+# svaku konfiguraciju iz matrice i koordinise prelazak sa posla na posao.
 
 
 class _Stub:
@@ -39,7 +41,7 @@ class _OfferView:
 
 class ControllerState:
     def __init__(self, spec, verbose=False, rng=None):
-        # spec je RunSpec (in_process/config.py) — ista definicija konfiguracije
+        # spec je RunSpec (core/config.py) — ista definicija konfiguracije
         # koju koristi i in-process matrica
         self.spec = spec
         self.strategy_name = spec.overlay
@@ -243,58 +245,3 @@ class _Server(ThreadingHTTPServer):
 
 def serve(state, host, port):
     return _Server((host, port), make_handler(state))
-
-
-def _write_results(state, path):
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    state.metrics.write_csv(path)
-
-
-def main():
-    # jedan scenario: env varijable su samo izmene u odnosu na configs/defaults.json
-    d = load_defaults()
-    env = lambda k, default: os.environ.get(k, str(default))
-    spec = spec_from(
-        n_honest=int(env("N_HONEST", d["n_honest"][0])),
-        beta=float(env("BETA", d["beta"][0])),
-        overlay=env("STRATEGY", d["overlay"][0]),
-        aggregation=env("AGGREGATION", d["aggregation"][0]),
-        seed=int(env("SEED", d["seeds"][0])),
-        peer_set_size=int(env("PEER_SET_SIZE", d["peer_set_size"])),
-        num_rounds=int(env("ROUNDS", d["num_rounds"])),
-        coordinated_value=float(env("COORDINATED_VALUE", d["coordinated_value"])),
-        activate_round=int(env("WARMUP", d["warmup"])) + 1,
-        pow_difficulty_bits=int(env("POW_BITS", d["pow_difficulty_bits"])),
-        num_buckets=int(env("NUM_BUCKETS", d["num_buckets"])),
-        byzantine_fraction=float(env("BYZANTINE_FRACTION", d["byzantine_fraction"])),
-        byzantine_profile=env("BYZANTINE_PROFILE", d["byzantine_profile"][0]),
-        flooding=int(env("FLOODING", d["flooding"])),
-        churn_period=int(env("CHURN_PERIOD", d["churn_period"])),
-        selective_p=float(env("SELECTIVE_P", d["selective_p"])),
-        timeout_rounds=int(env("TIMEOUT_ROUNDS", d["timeout_rounds"])),
-        unresponsive_p=float(env("UNRESPONSIVE_P", d["unresponsive_p"])),
-        trim_alpha=float(env("TRIM_ALPHA", d["trim_alpha"])),
-        eclipse_targets=int(env("ECLIPSE_TARGETS", d["eclipse_targets"])),
-    )
-    n_byz, n_syb = spec.malicious_counts()
-    state = ControllerState(spec, verbose=True)
-    port = int(os.environ.get("PORT", "8000"))
-    server = serve(state, "0.0.0.0", port)
-    print(f"controller up: n={state.n} byz={n_byz} sybil={n_syb} beta={spec.beta} "
-          f"strategy={state.strategy_name} agg={state.aggregation_name} x_star={state.x_star:.4f}",
-          flush=True)
-
-    def watch():
-        while not state.complete():
-            time.sleep(0.2)
-        _write_results(state, "results/distributed.csv")
-        last = state.metrics.rows[-1]
-        print(f"run complete: final err_rel={last.err_rel:.4e} "
-              f"sybil_pen={last.sybil_penetration:.3f} -> results/distributed.csv", flush=True)
-
-    threading.Thread(target=watch, daemon=True).start()
-    server.serve_forever()
-
-
-if __name__ == "__main__":
-    main()

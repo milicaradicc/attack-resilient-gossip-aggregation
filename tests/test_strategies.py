@@ -114,7 +114,7 @@ def test_peer_set_never_exceeds_limit():
     # da prekoraci K, ni tokom napada kada se kandidati guraju svake runde
     from core.config import spec_from
     from core.setup import build_world
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from aggregation import get_aggregation
     from metrics.experiment_metrics import ExperimentMetrics
@@ -143,7 +143,7 @@ def test_eclipse_never_exceeds_bucket_limit():
     # cvorovi startuju sa prekoracenjem koje strategija ne moze da ukloni.
     from collections import Counter
     from core.config import spec_from
-    from core.engine import Engine
+    from in_process.engine import Engine
     from core.rng import make_rng
     from core.setup import build_world
     from aggregation import get_aggregation
@@ -191,7 +191,7 @@ def test_admission_decision_respects_bucket_limit():
     for round_now in range(1, spec.num_rounds + 1):
         for node in world.nodes.values():
             before = Counter(strategy.bucket(p) for p in node.peers)
-            round_ops.admit(node, candidates, strategy, round_now)
+            round_ops.admit(node, strategy, round_now, offered=candidates)
             after = Counter(strategy.bucket(p) for p in node.peers)
             for bucket, count in after.items():
                 assert count <= max(limit, before.get(bucket, 0)), (

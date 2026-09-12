@@ -21,10 +21,10 @@ from sampling import get_strategy
 def _get(url):
     try:
         with urllib.request.urlopen(url, timeout=10) as r:
-            return r.status, json.loads(r.read())
-    except urllib.error.HTTPError as e:
+            return r.status, json.loads(r.read()) # statusni kod i telo
+    except urllib.error.HTTPError as e: # server odgovorio sa kodom greske
         return e.code, None
-    except (urllib.error.URLError, ConnectionError, OSError):
+    except (urllib.error.URLError, ConnectionError, OSError): # server nije odgovorio
         return 503, None
 
 
@@ -41,16 +41,8 @@ def _post(url, obj):
         return 503, None
 
 
-def _wait_config(base, poll=0.1, tries=600):
-    for _ in range(tries):
-        status, cfg = _get(f"{base}/config")
-        if status == 200:
-            return cfg
-        time.sleep(poll)
-    raise RuntimeError("controller unreachable")
-
-
 def _block_get(url, poll=0.05):
+    # ponavlja se zahtev dok se ne dobije 200, pedeset milisek da se ne zagusi 
     while True:
         status, body = _get(url)
         if status == 200:
@@ -73,8 +65,9 @@ def _sendable(value):
 
 
 def _tag(payload, job):
-    if job is not None:
-        payload["job"] = job
+    # svaki zahtev nosi oznaku konfiguracije, da se stanja razlicitih poslova
+    # iz matrice ne bi mesala na controlleru
+    payload["job"] = job
     return payload
 
 
@@ -89,9 +82,13 @@ def _build(cfg):
     return params, registry, scenario
 
 
-def run_honest(base, node_id, cfg, job=None):
+def run_honest(base, node_id, cfg, job):
     params, registry, scenario = _build(cfg)
-    apath = f"{base}/assignment/{node_id}" if job is None else f"{base}/assignment/{job}/{node_id}"
+    if node_id == 1 or node_id == "1":
+        print(cfg)
+        print("///////////////////////////////////////////////////////////")
+        print(params,registry,scenario)
+    apath = f"{base}/assignment/{job}/{node_id}"
     _, assign = _get(apath)
     node = Node.create(node_id, assign["x_local"])
     node.peers = list(assign["peers"])
@@ -106,7 +103,7 @@ def run_honest(base, node_id, cfg, job=None):
     for r in range(1, cfg["num_rounds"] + 1):
         scenario.before_round({node_id: node}, r)
         _block_post(f"{base}/peers", _tag({"node_id": node_id, "round": r, "peers": node.peers}, job))
-        opath = f"{base}/offers/{node_id}/{r}" if job is None else f"{base}/offers/{job}/{node_id}/{r}"
+        opath = f"{base}/offers/{job}/{node_id}/{r}"
         offers = _block_get(opath)["offers"]
 
         # 5.1.8: dogadjaji nastaju lokalno na cvoru, pa se salju controlleru u izvestaju
@@ -115,7 +112,9 @@ def run_honest(base, node_id, cfg, job=None):
         # 5.1.5: isti transportni sloj koji koristi i in-process putanja
         transport = Transport()
         # ista admission logika koju koristi i in-process Engine
-        offered, rejected, reasons = round_ops.admit(node, offers, strategy, r,
+        # discovery kao razmena: zahtev pa ponude, koje admit preuzima iz sanduceta
+        round_ops.request_peers(node, offers, r, transport=transport)
+        offered, rejected, reasons = round_ops.admit(node, strategy, r,
                                                      trace=trace, transport=transport)
 
         own = node.estimate
@@ -149,7 +148,7 @@ def run_honest(base, node_id, cfg, job=None):
             "trace": trace.csv_rows() if trace is not None else None}, job))
 
 
-def run_malicious(base, node_id, cfg, job=None):
+def run_malicious(base, node_id, cfg, job):
     _, _, scenario = _build(cfg)
     for r in range(1, cfg["num_rounds"] + 1):
         _block_post(f"{base}/broadcast", _tag(
@@ -157,16 +156,9 @@ def run_malicious(base, node_id, cfg, job=None):
              "value": _sendable(scenario.broadcast_value(node_id, 0.0, r))}, job))
 
 
-def run_node(base, node_id):
-    cfg = _wait_config(base)
-    if node_id in set(cfg["byzantine"]) | set(cfg["sybil"]):
-        run_malicious(base, node_id, cfg)
-    else:
-        run_honest(base, node_id, cfg)
-
-
 def run_matrix_node(base, node_id):
-    info = _block_get(f"{base}/jobs")
+    info = _block_get(f"{base}/jobs") # {"n_jobs": 36, "max_nodes": 14}
+    print(info)
     for job in range(info["n_jobs"]):
         cfg = _block_get(f"{base}/job/{job}")
         if node_id >= cfg["participants"]:
@@ -180,10 +172,7 @@ def run_matrix_node(base, node_id):
 def main():
     base = os.environ["CONTROLLER_URL"]
     node_id = int(os.environ["NODE_ID"])
-    if os.environ.get("MODE") == "matrix":
-        run_matrix_node(base, node_id)
-    else:
-        run_node(base, node_id)
+    run_matrix_node(base, node_id)
     print(f"node {node_id} done", flush=True)
 
 
