@@ -84,10 +84,6 @@ def _build(cfg):
 
 def run_honest(base, node_id, cfg, job):
     params, registry, scenario = _build(cfg)
-    if node_id == 1 or node_id == "1":
-        print(cfg)
-        print("///////////////////////////////////////////////////////////")
-        print(params,registry,scenario)
     apath = f"{base}/assignment/{job}/{node_id}"
     _, assign = _get(apath)
     node = Node.create(node_id, assign["x_local"])
@@ -158,7 +154,6 @@ def run_malicious(base, node_id, cfg, job):
 
 def run_matrix_node(base, node_id):
     info = _block_get(f"{base}/jobs") # {"n_jobs": 36, "max_nodes": 14}
-    print(info)
     for job in range(info["n_jobs"]):
         cfg = _block_get(f"{base}/job/{job}")
         if node_id >= cfg["participants"]:

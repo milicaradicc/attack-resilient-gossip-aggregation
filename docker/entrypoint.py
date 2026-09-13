@@ -5,8 +5,8 @@ import os
 ROLE = os.environ.get("ROLE")
 
 if ROLE == "controller":
-    from docker.matrix_service import main
+    from docker.matrix import main
 else:
-    from docker.node_service import main
+    from docker.node import main
 
 main()

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
 
 from core.rng import make_rng
 from core.setup import build_world
@@ -172,76 +171,3 @@ class ControllerState:
 
     def complete(self):
         return len(self.recorded) >= self.num_rounds + 1
-
-
-def make_handler(state):
-    class Handler(BaseHTTPRequestHandler):
-        def log_message(self, *a):
-            pass
-
-        def _send(self, code, obj):
-            body = json.dumps(obj).encode()
-            self.send_response(code)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def _body(self):
-            n = int(self.headers.get("Content-Length", 0))
-            return json.loads(self.rfile.read(n) or b"{}")
-
-        def do_GET(self):
-            parts = self.path.strip("/").split("/")
-            if parts[0] == "config":
-                self._send(200, state.config_payload())
-            elif parts[0] == "assignment":
-                i = int(parts[1])
-                self._send(200, {"node_id": i, **state.assignments[i]})
-            elif parts[0] == "offers":
-                i, r = int(parts[1]), int(parts[2])
-                with state.lock:
-                    state.maybe_build_offers(r)
-                    ready = (r, i) in state.offers
-                    offers = state.offers.get((r, i))
-                self._send(200 if ready else 425, {"offers": offers} if ready else {"ready": False})
-            else:
-                self._send(404, {})
-
-        def do_POST(self):
-            parts = self.path.strip("/").split("/")
-            data = self._body()
-            if parts[0] == "peers":
-                with state.lock:
-                    state.peers_in.setdefault(data["round"], {})[data["node_id"]] = data["peers"]
-                self._send(200, {"ok": True})
-            elif parts[0] == "broadcast":
-                with state.lock:
-                    state.broadcasts.setdefault(data["round"], {})[data["node_id"]] = data["value"]
-                self._send(200, {"ok": True})
-            elif parts[0] == "values":
-                r = data["round"]
-                with state.lock:
-                    ready = len(state.broadcasts.get(r, {})) == state.n_total
-                    b = state.broadcasts.get(r, {})
-                    out = ({str(p): b[p] for p in data["peers"]
-                            if p in b and b[p] is not None} if ready else None)
-                self._send(200 if ready else 425, {"values": out} if ready else {"ready": False})
-            elif parts[0] == "report":
-                with state.lock:
-                    state.reports.setdefault(data["round"], {})[data["node_id"]] = data
-                    state.maybe_record(data["round"])
-                self._send(200, {"ok": True})
-            else:
-                self._send(404, {})
-
-    return Handler
-
-
-class _Server(ThreadingHTTPServer):
-    daemon_threads = True
-    request_queue_size = 256
-
-
-def serve(state, host, port):
-    return _Server((host, port), make_handler(state))

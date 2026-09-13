@@ -8,8 +8,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.rng import make_rng
-from docker.controller_service import ControllerState, serve
-from docker.node_service import run_node
+from docker.run_state import ControllerState, serve
+from docker.node import run_node
 from core.config import load_matrix
 from in_process.matrix import run_single
 

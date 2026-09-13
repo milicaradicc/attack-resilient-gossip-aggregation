@@ -7,8 +7,8 @@ import threading
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from docker.matrix_service import MatrixState, serve
-from docker.node_service import run_matrix_node
+from docker.matrix import MatrixState, serve
+from docker.node import run_matrix_node
 from core.config import load_matrix
 from in_process.matrix import run_single, summarize
 
