@@ -63,9 +63,9 @@ def test_observation_counts_total_misses_and_timeouts():
     world = build_world(spec)
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
     Engine(world.nodes, get_aggregation("mean"),
-           get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params),
+           get_strategy(spec.overlay, spec.peer_set_size, world.id_params),
            world.scenario, spec.num_rounds, metrics, make_rng(spec.seed, "x"),
-           timeout_rounds=spec.timeout_rounds).run()
+           world.nonces, timeout_rounds=spec.timeout_rounds).run()
     obs = [o for node in world.nodes.values() for o in node.observations.values()]
     assert any(o.missed_total > 0 for o in obs)
     assert any(o.timeout_count > 0 for o in obs)

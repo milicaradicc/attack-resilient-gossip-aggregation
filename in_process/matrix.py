@@ -37,19 +37,19 @@ SUMMARY_FIELDS = [
 
 
 def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
-    # svet (cvorovi, identiteti, PoW registar, scenario) sklapa se u core/setup.py,
-    # istom funkcijom koju koristi i distribuirani controller
+    # svet (cvorovi, identiteti i njihovi nonce-ovi, scenario) sklapa se u
+    # core/setup.py, istom funkcijom koju koristi i distribuirani controller
     world = build_world(spec)
 
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets,
                                 per_node=spec.per_node_metrics)
-    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params)
+    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
 
     engine = Engine(world.nodes, aggregation, sampling, world.scenario, spec.num_rounds,
-                    metrics, rng, timeout_rounds=spec.timeout_rounds, trace=trace)
+                    metrics, rng, world.nonces, timeout_rounds=spec.timeout_rounds, trace=trace)
     engine.run()
     return metrics
 

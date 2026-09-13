@@ -10,7 +10,7 @@ from core.overlay import build_random_overlay
 from core.rng import make_rng
 from identity.observation import Observation
 from identity.pow import solve_pow
-from identity.registry import IdentityParams, IdentityRegistry
+from identity.params import IdentityParams
 
 
 @dataclass
@@ -44,18 +44,21 @@ def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
 def seed_observations(nodes: Dict[int, Node]) -> None:
     # za svaki cvor za svaki peer se belezi starost, od runde 0
     # starost identiteta se računa kao (trenutna_runda - first_seen)
+    # pocetna topologija su unapred poznati (bootstrap) peer-ovi, pa se
+    # njihov nonce ovde direktno cita sa samog peer-a (nodes[peer].nonce),
+    # ne trazi se ni iz kakvog registra
     # TODO proveriti ostala polja jel se update kako treba
     for node in nodes.values():
         for peer in node.peers:
-            node.observations[peer] = Observation(first_seen_round=0, last_seen_round=0)
+            node.observations[peer] = Observation(first_seen_round=0, last_seen_round=0,
+                                                   nonce=nodes[peer].nonce)
 
 
-def register_all(ids: Set[int], params: IdentityParams) -> IdentityRegistry:
-    # resavanje pow da bi se registrovali
-    registry = IdentityRegistry()
-    for i in ids:
-        registry.register(i, solve_pow(str(i), params.pow_difficulty_bits))
-    return registry
+def solve_nonces(ids: Set[int], params: IdentityParams) -> Dict[int, int]:
+    # svaki identitet sam resava svoj PoW i cuva nonce kod sebe; ne postoji
+    # centralni registar koji bi to potvrdjivao — verifikacija (verify_pow)
+    # je javna funkcija koju svako moze sam da izracuna nad (identitet, nonce)
+    return {i: solve_pow(str(i), params.pow_difficulty_bits) for i in ids}
 
 
 def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
@@ -77,16 +80,17 @@ class World:
     honest: Set[int]
     byzantine: Set[int]
     sybil: Set[int]
-    registry: IdentityRegistry
+    nonces: Dict[int, int]
     id_params: IdentityParams
     scenario: Scenario
     x_star: float
 
 
 def build_world(spec) -> World:
-    # jedno mesto na kome se sklapa svet: cvorovi, identiteti, PoW registar i scenario napada
-    # koriste ga i in-process matrica (experiments/matrix.py) i distribuirani controller,
-    # da se priprema eksperimenta ne bi duplirala i vremenom razisla
+    # jedno mesto na kome se sklapa svet: cvorovi, identiteti (svaki sa svojim
+    # nonce-om) i scenario napada. Koriste ga i in-process matrica
+    # (experiments/matrix.py) i distribuirani controller, da se priprema
+    # eksperimenta ne bi duplirala i vremenom razisla
     cfg = RunConfig(
         n_honest=spec.n_honest,
         peer_set_size=spec.peer_set_size,
@@ -98,7 +102,6 @@ def build_world(spec) -> World:
         max_per_bucket=spec.max_per_bucket,
     )
     nodes = build_nodes(cfg)
-    seed_observations(nodes)
 
     honest = set(nodes.keys())
     n_byzantine, n_sybil = spec.malicious_counts()
@@ -116,7 +119,12 @@ def build_world(spec) -> World:
         max_per_bucket=spec.max_per_bucket,
         timeout_rounds=spec.timeout_rounds,
     )
-    registry = register_all(honest | byzantine | sybil, id_params)
+    nonces = solve_nonces(honest | byzantine | sybil, id_params)
+    for i in honest:
+        nodes[i].nonce = nonces[i]
+    # tek sad svaki honest cvor ima svoj nonce, pa pocetna topologija
+    # (bootstrap peer-ovi) moze da ga zabelezi direktno sa peer-a
+    seed_observations(nodes)
     x_star = mean(n.x_local for n in nodes.values())
 
     if n_byzantine + n_sybil == 0:
@@ -142,4 +150,4 @@ def build_world(spec) -> World:
             delay_rounds=spec.delay_rounds,
         ))
 
-    return World(cfg, nodes, honest, byzantine, sybil, registry, id_params, scenario, x_star)
+    return World(cfg, nodes, honest, byzantine, sybil, nonces, id_params, scenario, x_star)

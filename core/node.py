@@ -13,6 +13,7 @@ class Node:
     estimate: float = field(default=0.0) # lokalna agregaciona procena 
     peers: List[int] = field(default_factory=list) # lokalni peer set
     observations: Dict[int, Observation] = field(default_factory=dict) # observation log
+    nonce: int = 0 # sopstveni resen PoW nonce; cvor ga sam cuva, nema centralnog registra
 
     @classmethod
     def create(cls, node_id: int, x_local: float) -> "Node":

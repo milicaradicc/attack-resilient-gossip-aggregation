@@ -21,10 +21,10 @@ def _run_world(spec):
     world = build_world(spec)
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
     agg = get_aggregation(spec.aggregation)
-    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params)
+    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params)
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
     Engine(world.nodes, agg, sampling, world.scenario, spec.num_rounds, metrics, rng,
-           timeout_rounds=spec.timeout_rounds).run()
+           world.nonces, timeout_rounds=spec.timeout_rounds).run()
     return world, metrics
 
 

@@ -56,10 +56,13 @@ class Transport:
         self.send(messages.control(messages.PEER_REQUEST, round_now,
                                    node_id, target=to))
 
-    def offer(self, round_now: int, candidate: int, to_node: int) -> None:
-        # kandidat se reklamira cvoru koji odlucuje o prijemu
+    def offer(self, round_now: int, candidate: int, to_node: int,
+              nonce: int = None) -> None:
+        # kandidat se reklamira cvoru koji odlucuje o prijemu, i nosi
+        # sopstveni PoW nonce kao deo ponude — primalac ga verifikuje
+        # direktno iz poruke, ne pita nikakav registar
         self.send(messages.control(messages.PEER_EXCHANGE, round_now,
-                                   candidate, target=to_node))
+                                   candidate, target=to_node, payload=nonce))
 
     def accept(self, round_now: int, node_id: int, candidate: int) -> None:
         self.send(messages.control(messages.ADMISSION, round_now,

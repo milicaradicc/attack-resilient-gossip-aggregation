@@ -14,13 +14,15 @@ def empty_reasons() -> Dict[str, int]:
     return {k: 0 for k in REASON_KEYS}
 
 
-def observe(node, other: int, round_now: int, exchanged: bool) -> None:
+def observe(node, other: int, round_now: int, exchanged: bool, nonce: int = None) -> None:
     obs = node.observations.get(other)
-    # ako peer nije vidjen ranije dodaj observation
+    # ako peer nije vidjen ranije dodaj observation; nonce je ono sto je peer
+    # sam predstavio u ponudi (videti request_peers/transport.offer) — ostaje
+    # zapamcen uz njega, ne trazi se ponovo iz nekog registra
     if obs is None:
         node.observations[other] = Observation(
             first_seen_round=round_now, last_seen_round=round_now,
-            successful_exchanges=1 if exchanged else 0)
+            successful_exchanges=1 if exchanged else 0, nonce=nonce)
     # ako jeste ziv je i osvezava se
     else:
         obs.last_seen_round = round_now
@@ -30,35 +32,44 @@ def observe(node, other: int, round_now: int, exchanged: bool) -> None:
 
 
 def request_peers(node, candidates: List[int], round_now: int,
-                  transport=None) -> None:
+                  transport=None, nonces: Dict[int, int] = None) -> None:
     # 5.1.5: discovery kao razmena — cvor salje zahtev, a odgovor stize kao niz
     # peer_exchange poruka, po jedna za svakog ponudjenog kandidata. Izvor svake
-    # ponude je sam identitet koji se reklamira.
+    # ponude je sam identitet koji se reklamira, a poruka nosi i njegov PoW
+    # nonce — 'nonces' ovde nije registar kome se admission obraca, nego samo
+    # nacin da se u simulaciji sastavi ta poruka (honest cvor bi nonce citao
+    # sam iz sebe; ovde ga za sve identitete drzi Engine/World jednom, o
+    # nonce se pri admisiji nikad ne pita — samo se cita ono sto stigne u poruci)
     if transport is None:
         return
     transport.request_peers(round_now, node.node_id, node.node_id)
+    nonces = nonces or {}
     for candidate in candidates:
-        transport.offer(round_now, candidate, node.node_id)
+        transport.offer(round_now, candidate, node.node_id, nonce=nonces.get(candidate))
 
 
-def admit(node, sampling, round_now: int, offered: List[int] = None,
+def admit(node, sampling, round_now: int, offered: List = None,
           trace=None, transport=None) -> Tuple[int, int, Dict[str, int]]:
-    # admission + eviction za JEDAN cvor. Kandidati se preuzimaju iz sanduceta,
-    # gde su stigli kao odgovor na zahtev (videti request_peers). Lista 'offered'
-    # koristi se samo kada transport nije zadat, npr. u testovima.
+    # admission + eviction za JEDAN cvor. Kandidati (id, nonce) parovi se
+    # preuzimaju iz sanduceta, gde su stigli kao odgovor na zahtev (videti
+    # request_peers) — nonce je deo same poruke, ne trazi se nigde spolja.
+    # Lista 'offered' koristi se samo kada transport nije zadat (npr. u
+    # testovima) i moze biti gola lista id-jeva (bez PoW-a) ili (id, nonce) parova.
     if transport is not None:
-        offered = [m.source for m in transport.receive(node.node_id,
-                                                       messages.PEER_EXCHANGE)]
+        exchanges = [(m.source, m.payload) for m in transport.receive(
+            node.node_id, messages.PEER_EXCHANGE)]
     elif offered is None:
-        offered = []
+        exchanges = []
+    else:
+        exchanges = [o if isinstance(o, tuple) else (o, None) for o in offered]
     reasons = empty_reasons()
     if trace is not None:
-        flooded = sum(1 for c in offered if c >= FLOOD_BASE)
+        flooded = sum(1 for c, _ in exchanges if c >= FLOOD_BASE)
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
-    for candidate in offered:
+    for candidate, nonce in exchanges:
         # zabelezi u dnevnik (vidjanje, ne razmena) -> time mu starost pocinje da tece
-        observe(node, candidate, round_now, exchanged=False)
+        observe(node, candidate, round_now, exchanged=False, nonce=nonce)
         # ako je kandidat vec komsija skip
         if candidate in node.peers:
             continue
@@ -91,7 +102,7 @@ def admit(node, sampling, round_now: int, offered: List[int] = None,
                 transport.reject(round_now, node.node_id, candidate, why)
             if trace is not None:
                 trace.reject(round_now, node.node_id, candidate, why)
-    return len(offered), sum(reasons.values()), reasons
+    return len(exchanges), sum(reasons.values()), reasons
 
 
 def heartbeat(node, peers: List[int], scenario, round_now: int, rng,

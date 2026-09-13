@@ -9,7 +9,7 @@ from core.node import Node
 from identity.buckets import bucket_of
 from identity.observation import Observation
 from identity.pow import solve_pow
-from identity.registry import IdentityParams, IdentityRegistry
+from identity.params import IdentityParams
 from sampling.eclipse_resistant import EclipseResistantStrategy
 from sampling.sybil_resistant import SybilResistantStrategy
 
@@ -19,11 +19,9 @@ PARAMS = IdentityParams(
 )
 
 
-def _registry(*ids: int) -> IdentityRegistry:
-    reg = IdentityRegistry()
-    for i in ids:
-        reg.register(i, solve_pow(str(i), PARAMS.pow_difficulty_bits))
-    return reg
+def _nonce(identity: int) -> int:
+    # simulira ono sto bi identitet sam vec bio resio i predstavio u ponudi
+    return solve_pow(str(identity), PARAMS.pow_difficulty_bits)
 
 
 def _node() -> Node:
@@ -31,44 +29,40 @@ def _node() -> Node:
 
 
 def test_valid_candidate_accepted():
-    reg = _registry(5)
-    s = SybilResistantStrategy(7, reg, PARAMS)
+    s = SybilResistantStrategy(7, PARAMS)
     n = _node()
-    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
+    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20, nonce=_nonce(5))
     assert s.accept_peer(n, 5, round_now=20) is True
 
 
 def test_candidate_without_pow_rejected():
-    reg = _registry()
-    s = SybilResistantStrategy(7, reg, PARAMS)
+    # nikad nije predstavio nonce (nema ga u sopstvenoj ponudi)
+    s = SybilResistantStrategy(7, PARAMS)
     n = _node()
     n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
     assert s.accept_peer(n, 5, round_now=20) is False
 
 
 def test_insufficient_age_rejected():
-    reg = _registry(5)
-    s = SybilResistantStrategy(7, reg, PARAMS)
+    s = SybilResistantStrategy(7, PARAMS)
     n = _node()
-    n.observations[5] = Observation(first_seen_round=19, last_seen_round=20)
+    n.observations[5] = Observation(first_seen_round=19, last_seen_round=20, nonce=_nonce(5))
     assert s.accept_peer(n, 5, round_now=20) is False
 
 
 def test_low_score_rejected():
-    reg = _registry(5)
-    s = SybilResistantStrategy(7, reg, PARAMS)
+    s = SybilResistantStrategy(7, PARAMS)
     n = _node()
-    n.observations[5] = Observation(first_seen_round=17, last_seen_round=20)
+    n.observations[5] = Observation(first_seen_round=17, last_seen_round=20, nonce=_nonce(5))
     assert s.accept_peer(n, 5, round_now=20) is False
 
 
 def test_eviction_removes_lowest_score():
-    reg = _registry(5, 6)
-    s = SybilResistantStrategy(2, reg, PARAMS)
+    s = SybilResistantStrategy(2, PARAMS)
     n = _node()
     n.peers = [5, 6]
-    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
-    n.observations[6] = Observation(first_seen_round=18, last_seen_round=20)
+    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20, nonce=_nonce(5))
+    n.observations[6] = Observation(first_seen_round=18, last_seen_round=20, nonce=_nonce(6))
     assert s.evict_peer(n, round_now=20) == 6
 
 
@@ -83,13 +77,14 @@ def _same_bucket_ids(target_bucket: int, count: int, exclude: set) -> list:
 
 
 def test_bucket_full_replaces_weaker():
-    reg = _registry(5)
     n = _node()
-    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
+    n.observations[5] = Observation(first_seen_round=0, last_seen_round=20, nonce=_nonce(5))
     b = bucket_of(str(5), PARAMS.num_buckets)
+    # clanovi bucketa namerno ostaju bez nonce-a (nikad nisu predstavili PoW),
+    # pa im je skor slabiji od kandidata 5 — isto kao u originalnom testu
     n.peers = _same_bucket_ids(b, PARAMS.max_per_bucket, exclude={5})
 
-    eclipse = EclipseResistantStrategy(7, reg, PARAMS)
+    eclipse = EclipseResistantStrategy(7, PARAMS)
     assert eclipse.accept_peer(n, 5, round_now=20) is True
     victim = eclipse.evict_peer(n, round_now=20, candidate=5)
     assert victim in n.peers and bucket_of(str(victim), PARAMS.num_buckets) == b
@@ -97,15 +92,14 @@ def test_bucket_full_replaces_weaker():
 
 def test_bucket_full_rejects_weaker_candidate():
     members = _same_bucket_ids(bucket_of(str(5), PARAMS.num_buckets), PARAMS.max_per_bucket, exclude={5})
-    reg = _registry(5, *members)
     n = _node()
     n.peers = list(members)
     for m in members:
         n.observations[m] = Observation(first_seen_round=0, last_seen_round=20,
-                                        successful_exchanges=PARAMS.exchange_max)
-    n.observations[5] = Observation(first_seen_round=14, last_seen_round=20)
+                                        successful_exchanges=PARAMS.exchange_max, nonce=_nonce(m))
+    n.observations[5] = Observation(first_seen_round=14, last_seen_round=20, nonce=_nonce(5))
 
-    eclipse = EclipseResistantStrategy(7, reg, PARAMS)
+    eclipse = EclipseResistantStrategy(7, PARAMS)
     assert eclipse.accept_peer(n, 5, round_now=20) is False
 
 
@@ -126,10 +120,10 @@ def test_peer_set_never_exceeds_limit():
         world = build_world(spec)
         metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
         Engine(world.nodes, get_aggregation("trimmed_mean", alpha=spec.trim_alpha),
-               get_strategy(overlay, spec.peer_set_size, world.registry, world.id_params),
+               get_strategy(overlay, spec.peer_set_size, world.id_params),
                world.scenario, spec.num_rounds, metrics,
                make_rng(spec.seed, "matrix", overlay, spec.aggregation),
-               timeout_rounds=spec.timeout_rounds).run()
+               world.nonces, timeout_rounds=spec.timeout_rounds).run()
         for node_id, node in world.nodes.items():
             assert len(node.peers) <= spec.peer_set_size, (
                 f"{overlay}: cvor {node_id} ima {len(node.peers)} suseda")
@@ -157,13 +151,12 @@ def test_eclipse_never_exceeds_bucket_limit():
         pocetno = max(max(Counter(bucket_of(str(p), spec.num_buckets)
                                   for p in nd.peers).values())
                       for nd in world.nodes.values())
-        strategy = get_strategy("eclipse_resistant", spec.peer_set_size,
-                                world.registry, world.id_params)
+        strategy = get_strategy("eclipse_resistant", spec.peer_set_size, world.id_params)
         metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
         Engine(world.nodes, get_aggregation("trimmed_mean", alpha=spec.trim_alpha),
                strategy, world.scenario, spec.num_rounds, metrics,
                make_rng(spec.seed, "matrix", "eclipse_resistant", spec.aggregation),
-               timeout_rounds=spec.timeout_rounds).run()
+               world.nonces, timeout_rounds=spec.timeout_rounds).run()
         for node_id, node in world.nodes.items():
             counts = Counter(strategy.bucket(p) for p in node.peers)
             worst = max(counts.values()) if counts else 0
@@ -184,10 +177,10 @@ def test_admission_decision_respects_bucket_limit():
                      aggregation="trimmed_mean", seed=1, num_rounds=30,
                      activate_round=1, pow_difficulty_bits=8)
     world = build_world(spec)
-    strategy = get_strategy("eclipse_resistant", spec.peer_set_size,
-                            world.registry, world.id_params)
+    strategy = get_strategy("eclipse_resistant", spec.peer_set_size, world.id_params)
     limit = world.id_params.max_per_bucket
-    candidates = sorted(world.byzantine | world.sybil)
+    # (id, nonce) parovi — kandidat nosi svoj nonce u ponudi, kao u pravoj poruci
+    candidates = [(i, world.nonces[i]) for i in sorted(world.byzantine | world.sybil)]
     for round_now in range(1, spec.num_rounds + 1):
         for node in world.nodes.values():
             before = Counter(strategy.bucket(p) for p in node.peers)

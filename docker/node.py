@@ -14,7 +14,7 @@ from core.transport import Transport
 from metrics.event_trace import EventTrace
 from core.node import Node
 from identity.observation import Observation
-from identity.registry import IdentityParams, IdentityRegistry
+from identity.params import IdentityParams
 from sampling import get_strategy
 
 
@@ -74,26 +74,30 @@ def _tag(payload, job):
 def _build(cfg):
     ip = cfg["id_params"]
     params = IdentityParams(**ip)
-    registry = IdentityRegistry()
-    for k, v in cfg["registry"].items():
-        registry.register(int(k), v)
+    # nonces: svaki identitet je sam resio svoj PoW; ovde se samo raspakuje
+    # ono sto je job kontroler prosledio kao deo konfiguracije posla
+    nonces = {int(k): v for k, v in cfg["nonces"].items()}
     scenario = Scenario(set(cfg["honest"]), set(cfg["byzantine"]), set(cfg["sybil"]),
                         AttackParams(**cfg["attack"]))
-    return params, registry, scenario
+    return params, nonces, scenario
 
 
 def run_honest(base, node_id, cfg, job):
-    params, registry, scenario = _build(cfg)
+    params, nonces, scenario = _build(cfg)
     apath = f"{base}/assignment/{job}/{node_id}"
     _, assign = _get(apath)
     node = Node.create(node_id, assign["x_local"])
     node.peers = list(assign["peers"])
+    node.nonce = nonces.get(node_id, 0)
     for p in node.peers:
-        node.observations[p] = Observation(first_seen_round=0, last_seen_round=0)
+        # pocetna topologija: bootstrap peer, nonce se cita direktno iz onoga
+        # sto je i njemu dodeljeno kao sopstveni nonce, ne iz registra
+        node.observations[p] = Observation(first_seen_round=0, last_seen_round=0,
+                                           nonce=nonces.get(p))
 
     agg_kwargs = {"alpha": cfg["trim_alpha"]} if cfg["aggregation"] == "trimmed_mean" else {}
     aggregation = get_aggregation(cfg["aggregation"], **agg_kwargs)
-    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], registry, params)
+    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], params)
     timeout_rounds = cfg["timeout_rounds"]
 
     for r in range(1, cfg["num_rounds"] + 1):
@@ -109,7 +113,7 @@ def run_honest(base, node_id, cfg, job):
         transport = Transport()
         # ista admission logika koju koristi i in-process Engine
         # discovery kao razmena: zahtev pa ponude, koje admit preuzima iz sanduceta
-        round_ops.request_peers(node, offers, r, transport=transport)
+        round_ops.request_peers(node, offers, r, transport=transport, nonces=nonces)
         offered, rejected, reasons = round_ops.admit(node, strategy, r,
                                                      trace=trace, transport=transport)
 

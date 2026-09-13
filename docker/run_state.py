@@ -59,7 +59,7 @@ class ControllerState:
                             for i, n in nodes.items()}
         self.honest, self.byzantine, self.sybil = world.honest, world.byzantine, world.sybil
         self.n_total = self.n + len(world.byzantine) + len(world.sybil)
-        self.registry = world.registry
+        self.nonces = world.nonces
         self.x_star = world.x_star
         self.num_rounds = world.cfg.num_rounds
         self.scenario = world.scenario
@@ -90,7 +90,7 @@ class ControllerState:
             "trace_events": self.spec.trace_events,
             "honest": sorted(self.honest), "byzantine": sorted(self.byzantine),
             "sybil": sorted(self.sybil), "x_star": self.x_star,
-            "registry": {str(k): v for k, v in self.registry.nonces.items()},
+            "nonces": {str(k): v for k, v in self.nonces.items()},
             "id_params": {
                 "pow_difficulty_bits": self.id_params.pow_difficulty_bits,
                 "age_min": self.id_params.age_min, 

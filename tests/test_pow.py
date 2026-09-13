@@ -43,9 +43,10 @@ def test_valid_for_lower_difficulty():
 
 
 def test_missing_nonce_rejected():
-    from identity.registry import IdentityRegistry
-    registry = IdentityRegistry()
-    assert registry.nonce_of(42) is None
+    # kandidat koji nikad nije predstavio svoj nonce nema sta da se verifikuje;
+    # posledica po admission proverava se na nivou strategije (test_strategies.py)
+    nonces: dict = {}
+    assert nonces.get(42) is None
 
 
 def test_zero_difficulty_accepts_any_nonce():

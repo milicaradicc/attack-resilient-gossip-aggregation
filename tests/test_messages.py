@@ -163,10 +163,10 @@ def test_all_control_types_are_used():
     world = build_world(spec)
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
     Engine(world.nodes, get_aggregation("trimmed_mean", alpha=spec.trim_alpha),
-           get_strategy(spec.overlay, spec.peer_set_size, world.registry, world.id_params),
+           get_strategy(spec.overlay, spec.peer_set_size, world.id_params),
            world.scenario, spec.num_rounds, metrics,
            make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation),
-           timeout_rounds=spec.timeout_rounds).run()
+           world.nonces, timeout_rounds=spec.timeout_rounds).run()
     # discovery, admission, odbijanje i heartbeat svi doprinose control saobracaju
     assert any(r.offered > 0 for r in metrics.rows)
     assert any(r.rejected > 0 for r in metrics.rows)

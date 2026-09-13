@@ -5,20 +5,23 @@ from typing import List, Optional
 
 from core.node import Node
 from identity.pow import verify_pow
-from identity.registry import IdentityParams, IdentityRegistry
+from identity.params import IdentityParams
 from identity.scoring import identity_score
 
 
 class SybilResistantStrategy:
     name = "sybil_resistant"
 
-    def __init__(self, max_peers: int, registry: IdentityRegistry, params: IdentityParams):
+    def __init__(self, max_peers: int, params: IdentityParams):
         self.max_peers = max_peers
-        self.registry = registry
         self.params = params
 
-    def pow_valid(self, candidate: int) -> bool:
-        nonce = self.registry.nonce_of(candidate)
+    def pow_valid(self, node: Node, candidate: int) -> bool:
+        # nema registra: nonce je ono sto je kandidat sam predstavio u svojoj
+        # peer_exchange ponudi i sto je observe() zabelezio uz njega (videti
+        # core/round_ops.py) — ovde se samo lokalno verifikuje javnom funkcijom
+        obs = node.observations.get(candidate)
+        nonce = obs.nonce if obs is not None else None
         if nonce is None:
             return False
         return verify_pow(str(candidate), nonce, self.params.pow_difficulty_bits)
@@ -28,14 +31,14 @@ class SybilResistantStrategy:
         first_seen = round_now if obs is None else obs.first_seen_round
         exchanges = 0 if obs is None else obs.successful_exchanges
         missed = 0 if obs is None else obs.missed_total
-        return identity_score(round_now, first_seen, exchanges, self.pow_valid(candidate),
+        return identity_score(round_now, first_seen, exchanges, self.pow_valid(node, candidate),
                               self.params.age_max, self.params.exchange_max,
                               missed_total=missed)
 
     def reason(self, node: Node, candidate: int, round_now: int) -> Optional[str]:
         if candidate == node.node_id or candidate in node.peers:
             return "self_or_duplicate"
-        if not self.pow_valid(candidate):
+        if not self.pow_valid(node, candidate):
             return "invalid_pow"
         obs = node.observations.get(candidate)
         age = 0 if obs is None else round_now - obs.first_seen_round

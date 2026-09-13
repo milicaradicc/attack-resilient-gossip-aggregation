@@ -10,7 +10,7 @@ class Engine:
     # podacima iz memorije; distribuirana verzija (docker/node_service.py) hrani
     # iste te funkcije podacima preko HTTP-a
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
-                 timeout_rounds: int = 0, trace=None):
+                 nonces, timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
         self.aggregation = aggregation
         self.sampling = sampling
@@ -18,6 +18,11 @@ class Engine:
         self.num_rounds = num_rounds
         self.metrics = metrics
         self.rng = rng
+        # nonces: svaki identitet je vec sam resio svoj PoW (World.nonces);
+        # ovde sluzi samo da se sastavi peer_exchange poruka koju candidate
+        # "salje" — admission (sampling) ovo nikad ne cita, samo ono sto
+        # stigne u poruci (videti core/round_ops.py)
+        self.nonces = nonces
         self.timeout_rounds = timeout_rounds
         self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
@@ -29,7 +34,8 @@ class Engine:
         # redosleda obrade, isto kao kod vrednosti.
         for node in self.nodes.values():
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
-            round_ops.request_peers(node, candidates, round_now, transport=transport)
+            round_ops.request_peers(node, candidates, round_now, transport=transport,
+                                    nonces=self.nonces)
         for node in self.nodes.values():
             n_off, _, node_reasons = round_ops.admit(node, self.sampling, round_now,
                                                      trace=self.trace,
