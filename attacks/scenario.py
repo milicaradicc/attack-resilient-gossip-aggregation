@@ -24,31 +24,25 @@ class AttackParams:
     random_high: float = 1000.0
     low_bias: float = 5.0
     x_star: float = 100.0
-    experiment_seed: int = 0 # 4.10: iz njega se izvode svi izvori randomness-a napada
+    experiment_seed: int = 0
     activate_round: int = 1
-    discovery_offers: int = 2 # honest kandidata po rundi, i bez napada
+    discovery_offers: int = 2 
     flooding: int = 0
     churn_period: int = 0
-    churn_offline: int = 1 # koliko rundi po ciklusu napadac izostaje
+    churn_offline: int = 1 
     selective_p: float = 1.0
     unresponsive_p: float = 0.0
-    delay_rounds: int = 0 # 0 = iskljuceno; >0 = za koliko rundi napadac kasni
-    eclipse_targets: int = 0 # 0 = napad je „širok" (svi cvorovi); >0 = ciljani Eclipse na N zrtava
+    delay_rounds: int = 0 
+    eclipse_targets: int = 0 
 
 
-# 5.1.6: redosled modula je fiksan zbog determinizma. Poisoning nudi napadacke
-# identitete, Eclipse zatim tu ponudu suzava na zrtve, pa flooding dodaje lazne
-# kandidate. Selective ide pre Byzantine, jer selektivno cutanje ima prednost
-# nad profilom vrednosti.
 def default_modules() -> tuple:
-    # nove instance po scenariju: delay modul pamti red poruka, pa se stanje
-    # ne sme deliti izmedju eksperimenata
     return (
         ChurnAttack(),
         PeerPoisoningAttack(),
-        EclipseAttack(),      # suzava ponudu poisoning-a na ciljane zrtve
+        EclipseAttack(),      
         PeerFloodingAttack(),
-        DelayAttack(),        # zadrzava poruku i isporucuje je kasnije
+        DelayAttack(),        
         SelectiveForwardingAttack(),
         ByzantineAttack(),
     )
@@ -56,8 +50,6 @@ def default_modules() -> tuple:
 
 @dataclass
 class Scenario:
-    # Scenario je koordinator: drzi ucesnike i parametre, a same napade
-    # izvrsavaju nezavisni moduli (attacks/*.py) iza zajednickog interfejsa
     honest_ids: Set[int]
     byzantine_ids: Set[int]
     sybil_ids: Set[int]
@@ -78,7 +70,6 @@ class Scenario:
         return AttackContext(self.honest_ids, self.byzantine_ids, self.sybil_ids, self.params)
 
     def active_modules(self) -> List:
-        # nezavisno ukljucivanje: modul ucestvuje samo ako je ukljucen parametrima
         ctx = self.ctx
         return [m for m in self.modules if m.enabled(ctx)]
 
@@ -88,9 +79,25 @@ class Scenario:
     def targets(self) -> List[int]:
         return self.ctx.targets()
 
+    def _churn(self):
+        for module in self.modules:
+            if getattr(module, "name", "") == "churn":
+                return module
+        return None
+
+    def offline_ids(self, round_now: int) -> Set[int]:
+        module = self._churn()
+        if module is None or not module.enabled(self.ctx) or not self.active(round_now):
+            return set()
+        return set(module.offline_ids(self.ctx, round_now))
+
+    def returning_count(self, round_now: int) -> int:
+        module = self._churn()
+        if module is None or not module.enabled(self.ctx) or not self.active(round_now):
+            return 0
+        return len(module.returning_ids(self.ctx, round_now))
+
     def responds(self, identity: int, round_now: int, rng: random.Random) -> bool:
-        # flooding uvodi identitete koji uopste ne postoje (FLOOD_BASE i dalje);
-        # takav peer nikada ne odgovara, pa ga heartbeat timeout uklanja
         if identity >= FLOOD_BASE:
             return False
         if not self.active(round_now) or identity not in self.malicious_ids:
@@ -113,32 +120,30 @@ class Scenario:
         return honest_value
 
     def offer_candidates(self, node: Node, round_now: int, rng: random.Random) -> List[int]:
-        # Peer sampling radi neprekidno, i kada napada nema: cvoru se u svakoj
-        # rundi predlaze nekoliko honest kandidata. Nad tom osnovom napadacki
-        # moduli zatim dodaju sopstvene identitete ili menjaju ponudu.
         ctx = self.ctx
         offers = self._discovery(node, rng)
         if not self.active(round_now):
             return offers
         for module in self.active_modules():
             offers = module.offer_candidates(ctx, node, round_now, rng, offers)
-        # redosled u ponudi ne sme da daje prednost: kandidat primljen poslednji
-        # ostaje u peer set-u jer ga nijedan naredni vise ne istiskuje
+        away = self.offline_ids(round_now)
+        if away:
+            offers = [c for c in offers if c not in away]
         rng.shuffle(offers)
         return offers
 
     def _discovery(self, node: Node, rng: random.Random) -> List[int]:
-        broj = self.params.discovery_offers
-        if broj <= 0:
+        count = self.params.discovery_offers
+        if count <= 0:
             return []
         pool = [h for h in sorted(self.honest_ids)
                 if h != node.node_id and h not in node.peers]
         rng.shuffle(pool)
-        return pool[:broj]
+        return pool[:count]
 
-    def before_round(self, nodes: Dict[int, Node], round_now: int) -> None:
-        # faza pre runde: moduli koji menjaju stanje pre nego sto discovery pocne
-        # (za sada samo churn, koji resetuje starost napadackih identiteta)
+    def before_round(self, nodes: Dict[int, Node], round_now: int, trace=None) -> None:
+        if not self.active(round_now):
+            return
         ctx = self.ctx
         for module in self.active_modules():
-            module.before_round(ctx, nodes, round_now)
+            module.before_round(ctx, nodes, round_now, trace=trace)

@@ -3,11 +3,6 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-# HTTP sloj: jedina tacka na kojoj sistem dodiruje mrezu. Rukovalac ne sadrzi
-# nikakvu logiku eksperimenta — on samo prevodi zahteve u pozive nad stanjem
-# matrice i vraca kod 425 dok uslov barijere nije ispunjen.
-
-
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
     request_queue_size = 256

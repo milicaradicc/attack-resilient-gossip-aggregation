@@ -21,10 +21,10 @@ from sampling import get_strategy
 def _get(url):
     try:
         with urllib.request.urlopen(url, timeout=10) as r:
-            return r.status, json.loads(r.read()) # statusni kod i telo
-    except urllib.error.HTTPError as e: # server odgovorio sa kodom greske
+            return r.status, json.loads(r.read()) 
+    except urllib.error.HTTPError as e: 
         return e.code, None
-    except (urllib.error.URLError, ConnectionError, OSError): # server nije odgovorio
+    except (urllib.error.URLError, ConnectionError, OSError):
         return 503, None
 
 
@@ -42,7 +42,6 @@ def _post(url, obj):
 
 
 def _block_get(url, poll=0.05):
-    # ponavlja se zahtev dok se ne dobije 200, pedeset milisek da se ne zagusi 
     while True:
         status, body = _get(url)
         if status == 200:
@@ -59,14 +58,10 @@ def _block_post(url, obj, poll=0.05):
 
 
 def _sendable(value):
-    # zadrzana poruka (delay) salje se kao None, da barijera i dalje broji ovog
-    # ucesnika, a controller je ne isporucuje susedima
     return None if value is NO_MESSAGE else value
 
 
 def _tag(payload, job):
-    # svaki zahtev nosi oznaku konfiguracije, da se stanja razlicitih poslova
-    # iz matrice ne bi mesala na controlleru
     payload["job"] = job
     return payload
 
@@ -74,8 +69,6 @@ def _tag(payload, job):
 def _build(cfg):
     ip = cfg["id_params"]
     params = IdentityParams(**ip)
-    # nonces: svaki identitet je sam resio svoj PoW; ovde se samo raspakuje
-    # ono sto je job kontroler prosledio kao deo konfiguracije posla
     nonces = {int(k): v for k, v in cfg["nonces"].items()}
     scenario = Scenario(set(cfg["honest"]), set(cfg["byzantine"]), set(cfg["sybil"]),
                         AttackParams(**cfg["attack"]))
@@ -90,8 +83,6 @@ def run_honest(base, node_id, cfg, job):
     node.peers = list(assign["peers"])
     node.nonce = nonces.get(node_id, 0)
     for p in node.peers:
-        # pocetna topologija: bootstrap peer, nonce se cita direktno iz onoga
-        # sto je i njemu dodeljeno kao sopstveni nonce, ne iz registra
         node.observations[p] = Observation(first_seen_round=0, last_seen_round=0,
                                            nonce=nonces.get(p))
 
@@ -101,18 +92,12 @@ def run_honest(base, node_id, cfg, job):
     timeout_rounds = cfg["timeout_rounds"]
 
     for r in range(1, cfg["num_rounds"] + 1):
-        scenario.before_round({node_id: node}, r)
+        trace = EventTrace() if cfg.get("trace_events") else None
+        scenario.before_round({node_id: node}, r, trace=trace)
         _block_post(f"{base}/peers", _tag({"node_id": node_id, "round": r, "peers": node.peers}, job))
         opath = f"{base}/offers/{job}/{node_id}/{r}"
         offers = _block_get(opath)["offers"]
-
-        # 5.1.8: dogadjaji nastaju lokalno na cvoru, pa se salju controlleru u izvestaju
-        trace = EventTrace() if cfg.get("trace_events") else None
-        # 5.1.5: poruke se broje po klasi, isto kao u in-process putanji
-        # 5.1.5: isti transportni sloj koji koristi i in-process putanja
         transport = Transport()
-        # ista admission logika koju koristi i in-process Engine
-        # discovery kao razmena: zahtev pa ponude, koje admit preuzima iz sanduceta
         round_ops.request_peers(node, offers, r, transport=transport, nonces=nonces)
         offered, rejected, reasons = round_ops.admit(node, strategy, r,
                                                      trace=trace, transport=transport)
@@ -124,12 +109,9 @@ def run_honest(base, node_id, cfg, job):
         vals = _block_post(f"{base}/values", _tag(
             {"node_id": node_id, "round": r, "peers": node.peers}, job))["values"]
 
-        # isti heartbeat/timeout mehanizam kao in-process
         responders, timeouts = round_ops.heartbeat(
             node, list(node.peers), scenario, r, None, timeout_rounds, trace=trace,
             transport=transport)
-        # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru,
-        # istom funkcijom koju koristi i in-process putanja
         emitted = {int(k): v for k, v in vals.items()}
         round_ops.deliver(node, responders, emitted, r, transport=transport)
         incoming = transport.receive(node_id, messages.AGGREGATE)

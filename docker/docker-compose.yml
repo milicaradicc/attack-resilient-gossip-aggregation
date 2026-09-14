@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       ROLE: "controller"
-      MATRIX_CONFIG: "configs/smoke.json"
-      MATRIX_OUT: "results/docker/smoke.csv"
+      MATRIX_CONFIG: "configs/tiny.json"
+      MATRIX_OUT: "results/docker/tiny.csv"
       PORT: "8000"
     ports:
       - "8000:8000"
@@ -109,46 +109,6 @@ services:
     environment:
       ROLE: node
       NODE_ID: "9"
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node10:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "10"
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node11:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "11"
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node12:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "12"
-      CONTROLLER_URL: http://controller:8000
-    depends_on:
-      - controller
-  node13:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    environment:
-      ROLE: node
-      NODE_ID: "13"
       CONTROLLER_URL: http://controller:8000
     depends_on:
       - controller

@@ -5,10 +5,6 @@ from typing import Optional
 
 from attacks.base import AttackContext, BaseAttack, module_rng
 
-# 3.9: selective forwarding i unresponsive ponasanje.
-# Napadac povremeno prosledjuje korektnu vrednost (da izbegne detekciju)
-# ili uopste ne odgovara na heartbeat.
-
 
 class SelectiveForwardingAttack(BaseAttack):
     name = "selective_forwarding"

@@ -9,11 +9,6 @@ from metrics.event_trace import EventTrace
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
 
-# Stanje jedne konfiguracije: sklapa svet, drzi sinhronu barijeru i belezi
-# metrike. Matricna sluzba (docker/matrix_service.py) drzi po jedan primerak za
-# svaku konfiguraciju iz matrice i koordinise prelazak sa posla na posao.
-
-
 class _Stub:
     __slots__ = ("peers", "estimate")
 
@@ -149,9 +144,9 @@ class ControllerState:
             # aktivacija napada je dogadjaj sistema, belezi je controller jednom
             if r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
-            cp = self.scenario.params.churn_period
-            if cp > 0 and r % cp == 0:
-                self.trace.churn_reset(r, len(self.scenario.malicious_ids))
+            vracanja = self.scenario.returning_count(r)
+            if vracanja:
+                self.trace.churn_reset(r, vracanja)
             # napadacke emisije zna controller (njemu stizu), pa ih on i belezi
             if self.scenario.active(r):
                 sent = self.broadcasts.get(r, {})

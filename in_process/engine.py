@@ -6,9 +6,9 @@ from metrics.experiment_metrics import RoundCounters
 
 
 class Engine:
-    # in-process pokretac: hrani zajednicku per-cvor logiku (core/round_ops.py)
-    # podacima iz memorije; distribuirana verzija (docker/node_service.py) hrani
-    # iste te funkcije podacima preko HTTP-a
+    # in-process runner: feeds the shared per-node logic (core/round_ops.py) with
+    # data held in memory; the distributed version (docker/node.py) feeds those
+    # same functions with data received over HTTP
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
                  nonces, timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
@@ -18,20 +18,20 @@ class Engine:
         self.num_rounds = num_rounds
         self.metrics = metrics
         self.rng = rng
-        # nonces: svaki identitet je vec sam resio svoj PoW (World.nonces);
-        # ovde sluzi samo da se sastavi peer_exchange poruka koju candidate
-        # "salje" — admission (sampling) ovo nikad ne cita, samo ono sto
-        # stigne u poruci (videti core/round_ops.py)
+        # nonces: every identity has already solved its own PoW (World.nonces);
+        # here this only serves to assemble the peer_exchange message the candidate
+        # "sends" - admission (sampling) never reads this, only what arrives in the
+        # message itself (see core/round_ops.py)
         self.nonces = nonces
         self.timeout_rounds = timeout_rounds
-        self.trace = trace # 5.1.8: opcioni zapis dogadjaja
+        self.trace = trace # 5.1.8: optional event log
 
     def _discover(self, round_now, transport=None):
         offered = 0
         reasons = round_ops.empty_reasons()
-        # 5.1.5: discovery je razmena — prvo svi cvorovi posalju zahtev i prime
-        # ponude, pa tek onda svi odlucuju. Time isporuka ponuda ne zavisi od
-        # redosleda obrade, isto kao kod vrednosti.
+        # 5.1.5: discovery is an exchange - first every node sends a request and
+        # receives offers, and only then does everyone decide. That way delivery of
+        # offers does not depend on processing order, same as for values.
         for node in self.nodes.values():
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
             round_ops.request_peers(node, candidates, round_now, transport=transport,
@@ -46,7 +46,7 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
-        # vrednosti se zamrzavaju pre isporuke (tick barrier)
+        # values are frozen before delivery (tick barrier)
         return round_ops.emitted_values(self.nodes, self.scenario, round_now,
                                         trace=self.trace)
 
@@ -56,38 +56,40 @@ class Engine:
                                    transport=transport)
 
     def run(self):
-        # sacuvaj prvu rundu
+        # record the initial round
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
 
         for r in range(1, self.num_rounds + 1):
-            # churn
-            self.scenario.before_round(self.nodes, r)
-            if (self.trace is not None and self.scenario.params.churn_period > 0
-                    and r > 0 and r % self.scenario.params.churn_period == 0):
-                self.trace.churn_reset(r, len(self.scenario.malicious_ids))
+            # churn: identities returning in this round start over as far as
+            # everyone else is concerned (their log at other nodes is wiped)
+            self.scenario.before_round(self.nodes, r, trace=self.trace)
+            if self.trace is not None:
+                comebacks = self.scenario.returning_count(r)
+                if comebacks:
+                    self.trace.churn_reset(r, comebacks)
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
-            # discover + admission
-            # 5.1.5: sve poruke runde prolaze kroz transportni sloj
+            # discovery + admission
+            # 5.1.5: every message of the round goes through the transport layer
             transport = Transport()
             offered, rejected, reasons = self._discover(r, transport=transport)
-            # na pocetku runce snimak
-            emitted = self._emit(r) # vrednosti svih ucesnika, i napadaca
+            # snapshot taken at the start of the round
+            emitted = self._emit(r) # values of all participants, attackers included
             own = {hid: n.estimate for hid, n in self.nodes.items()}
 
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng) # uzmi peerove za razmenu
+                peers = self.sampling.select_gossip_peers(node, self.rng) # peers for this exchange
                 responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
-                # svaki sused salje svoju vrednost kao zasebnu poruku ovom cvoru;
-                # primalac je preuzima iz sanduceta i iz nje vadi vrednost
+                # every neighbour sends its value to this node as a separate message;
+                # the receiver takes it out of its mailbox and reads the value from it
                 round_ops.deliver(node, responders, emitted, r, transport=transport)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)
-                node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
+                node.estimate = self.aggregation.aggregate(own[hid], received) # new estimate
                 if self.trace is not None:
                     self.trace.estimate(r, hid, node.estimate)
 

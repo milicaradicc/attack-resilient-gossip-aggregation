@@ -15,7 +15,6 @@ def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Rando
 
 
 class AttackContext:
-    # zajednicki pogled koji svaki modul dobija: ko su ucesnici i koji je parametar
     __slots__ = ("honest_ids", "byzantine_ids", "sybil_ids", "params")
 
     def __init__(self, honest_ids: Set[int], byzantine_ids: Set[int],
@@ -30,7 +29,6 @@ class AttackContext:
         return self.byzantine_ids | self.sybil_ids
 
     def targets(self) -> List[int]:
-        # ciljni cvorovi: prazna lista znaci da je napad "sirok" (svi cvorovi)
         k = self.params.eclipse_targets
         return sorted(self.honest_ids)[:k] if k > 0 else []
 
@@ -40,7 +38,6 @@ class AttackModule(Protocol):
     name: str
 
     def enabled(self, ctx: AttackContext) -> bool:
-        # da li je napad aktivan u eksperimentu
         ...
 
 
@@ -52,19 +49,15 @@ class BaseAttack:
 
     def offer_candidates(self, ctx: AttackContext, node, round_now: int,
                          rng: random.Random, offers: List[int]) -> List[int]:
-        # faza discovery: modul moze da doda ili ukloni kandidate
         return offers
 
     def broadcast_value(self, ctx: AttackContext, identity: int, value: float,
                         round_now: int) -> Optional[float]:
-        # faza emitovanja: vrati vrednost ili None ako modul ne menja emisiju
         return None
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
-        # faza heartbeat: vrati False za cutanje ili None ako modul ne odlucuje
         return None
 
     def before_round(self, ctx: AttackContext, nodes: Dict[int, object],
-                     round_now: int) -> None:
-        # pre runde: churn i slicne manipulacije stanja
+                     round_now: int, trace=None) -> None:
         return None

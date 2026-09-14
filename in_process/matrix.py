@@ -8,32 +8,14 @@ from typing import List
 
 from aggregation import get_aggregation
 from core.rng import make_rng
-from core.config import SWEEPABLE, RunSpec, load_matrix
+from core.config import RunSpec, load_matrix
 from in_process.engine import Engine
 from core.setup import build_world
 from metrics.event_trace import TRACE_FIELDS, EventTrace
 from metrics.experiment_metrics import FIELDS, NODE_FIELDS, ExperimentMetrics
+from metrics.export import (CONFIG_FIELDS, SUMMARY_FIELDS, summarize,
+                            varying_fields)
 from sampling import get_strategy
-
-CONFIG_FIELDS = ["n_honest", "beta", "overlay", "aggregation", "byzantine_profile", "seed"]
-
-SUMMARY_FIELDS = [
-    "final_err_rel", # relativna greska agregacije
-    "convergence_time", # vreme konvergencije
-    "recovery_time", # prva runda od koje greska trajno ostaje ispod praga
-    "stability", # stabilnost procene 
-    "data_overhead", # 6.3.8  data overhead
-    "control_overhead", # 6.3.7 kontrolni overhead
-    "rejected_ratio", # 6.3.9 rejected peer ratio
-    "bucket_occupancy", # 6.3.10 bucket occupancy distribucija
-    "rej_pow", 
-    "rej_age", 
-    "rej_score", 
-    "rej_bucket",
-    "final_sybil_penetration", # 6.3.4 sybil penetration 
-    "final_eclipse_rate", # 6.3.5 eclipse success rate
-]
-# 6.3.6 peer diversity
 
 
 def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
@@ -52,30 +34,6 @@ def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
                     metrics, rng, world.nonces, timeout_rounds=spec.timeout_rounds, trace=trace)
     engine.run()
     return metrics
-
-
-def summarize(spec: RunSpec, metrics: ExperimentMetrics) -> List:
-    last = metrics.rows[-1]
-    b = metrics.rejection_breakdown()
-    return [
-        last.err_rel,
-        metrics.convergence_time(spec.epsilon, since=spec.activate_round),
-        metrics.recovery_time(spec.epsilon, since=spec.activate_round),
-        metrics.stability(spec.conv_window_start),
-        metrics.data_overhead(spec.n_honest),
-        metrics.control_overhead(spec.n_honest),
-        metrics.rejected_ratio(),
-        metrics.mean_bucket_occupancy(),
-        b["pow"], b["age"], b["score"], b["bucket"],
-        last.sybil_penetration,
-        last.eclipse_rate,
-    ]
-
-
-def varying_fields(specs) -> List[str]:
-    # dopunski ablacioni scenariji svipuju i parametre napada; oni koji se menjaju
-    # dodaju se kao kolone da bi se redovi mogli razlikovati
-    return [k for k in SWEEPABLE if len({getattr(sp, k) for sp in specs}) > 1]
 
 
 def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: str = None) -> int:
