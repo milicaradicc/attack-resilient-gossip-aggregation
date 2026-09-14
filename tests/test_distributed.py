@@ -28,6 +28,21 @@ class _OneJob:
             spec, rng=make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation),
             verbose=False)
         self.max_nodes = self.state.n_total
+        self.addresses = {}
+        self.lock = threading.Lock()
+
+    def register_address(self, node_id, url):
+        with self.lock:
+            self.addresses[int(node_id)] = url
+
+    def all_addresses(self):
+        with self.lock:
+            if len(self.addresses) < self.max_nodes:
+                return None
+            return {str(k): v for k, v in self.addresses.items()}
+
+    def done(self):
+        return self.state.complete()
 
     def state_for(self, job):
         return self.state
@@ -94,9 +109,6 @@ def test_distributed_eclipse_matches_inprocess():
 
 
 def test_distributed_delay_matches_inprocess():
-    # 3.9: the delay attack holds a message back, so in some rounds a participant
-    # sends nothing; the barrier in distributed mode must tolerate that without
-    # the two paths diverging
     from core.config import spec_from
     spec = spec_from(n_honest=12, beta=0.3, overlay="random", aggregation="mean",
                      seed=1, num_rounds=20, activate_round=1, pow_difficulty_bits=8,
@@ -107,10 +119,6 @@ def test_distributed_delay_matches_inprocess():
 
 
 def test_distributed_churn_matches_inprocess():
-    # 3.8: a churn departure changes the peer sets (ChurnAttack.before_round) and
-    # the candidate offer (Scenario.offer_candidates). Both places exist in the
-    # distributed path too - the node removes the absent neighbour itself, and the
-    # controller filters the offer - so the result must match the in-process path
     from core.config import spec_from
     spec = spec_from(n_honest=12, beta=0.3, overlay="sybil_resistant",
                      aggregation="mean", seed=1, num_rounds=20, activate_round=1,
@@ -122,10 +130,44 @@ def test_distributed_churn_matches_inprocess():
     assert abs(d.sybil_penetration - i.sybil_penetration) < 1e-9
 
 
+def test_reported_peer_set_is_the_post_churn_one():
+    from core.config import spec_from
+    spec = spec_from(n_honest=12, beta=0.3, overlay="random", aggregation="mean",
+                     seed=1, num_rounds=16, activate_round=1, pow_difficulty_bits=8,
+                     churn_period=4, churn_offline=2, timeout_rounds=3)
+    matrix = _OneJob(spec)
+    server = serve(matrix, "127.0.0.1", 0)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{port}"
+    workers = [threading.Thread(target=run_matrix_node, args=(base, i))
+               for i in range(matrix.max_nodes)]
+    for w in workers:
+        w.start()
+    for w in workers:
+        w.join(timeout=120)
+    server.shutdown()
+
+    scenario = matrix.state.scenario
+    checked = 0
+    for r, reported in matrix.state.peers_in.items():
+        away = scenario.offline_ids(r)
+        if not away:
+            continue
+        for node_id, peers in reported.items():
+            leftover = away & set(peers)
+            assert not leftover, (
+                f"round {r}, node {node_id}: reported peer set still holds "
+                f"departed identities {leftover} - POST /peers ran before before_round")
+            checked += 1
+    assert checked, "no round with a departure was observed - the test proves nothing"
+
+
 if __name__ == "__main__":
     test_distributed_benign_matches_inprocess()
     test_distributed_attack_matches_inprocess()
     test_distributed_eclipse_matches_inprocess()
     test_distributed_delay_matches_inprocess()
     test_distributed_churn_matches_inprocess()
+    test_reported_peer_set_is_the_post_churn_one()
     print("OK - the distributed system (benign + attack) reproduces in-process")

@@ -13,7 +13,6 @@ PEER_EXCHANGE = "peer_exchange"   # ponuda kandidata kroz discovery
 ADMISSION = "admission"           # provera i prihvatanje kandidata
 PEER_REJECT = "peer_reject"       # odbijanje kandidata
 HEARTBEAT = "heartbeat"           # provera aktivnosti peer-a
-PEER_EVICT = "peer_evict"         # obavestenje o uklanjanju iz peer set-a
 
 # tip data poruke
 AGGREGATE = "aggregate"           # agregaciona vrednost

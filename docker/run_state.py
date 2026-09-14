@@ -3,22 +3,33 @@ from __future__ import annotations
 import threading
 
 
+from attacks.base import NO_MESSAGE
 from core.rng import make_rng
 from core.setup import build_world
 from metrics.event_trace import EventTrace
 from metrics.experiment_metrics import ExperimentMetrics, RoundCounters
 
 
+# The state of a single configuration: it assembles the world, holds the
+# synchronous barrier and records the metrics. The matrix service
+# (docker/matrix.py) keeps one instance per configuration in the matrix and
+# coordinates moving from one job to the next.
+#
+# 5.1.5: this object also plays the peer sampling service. Nodes do not compute
+# their own candidates - they report their peer set, and the answer comes back
+# over the wire as (identity, nonce) pairs (see maybe_build_offers).
+
+
 class _Stub:
     __slots__ = ("peers", "estimate")
 
     def __init__(self, peers, estimate):
-        self.peers = list(peers) # kopija liste
-        self.estimate = estimate # procena
+        self.peers = list(peers) # a copy of the list
+        self.estimate = estimate # the estimate
 
 
 def _row_to_event(row):
-    # red iz izvestaja cvora nazad u dogadjaj (redosled polja: TRACE_FIELDS)
+    # a row from a node's report back into an event (field order: TRACE_FIELDS)
     from metrics.event_trace import TraceEvent
     return TraceEvent(row[0], row[1], row[2],
                       None if row[3] == "" else row[3],
@@ -35,8 +46,8 @@ class _OfferView:
 
 class ControllerState:
     def __init__(self, spec, verbose=False, rng=None):
-        # spec je RunSpec (core/config.py) — ista definicija konfiguracije
-        # koju koristi i in-process matrica
+        # spec is a RunSpec (core/config.py) - the same configuration definition
+        # the in-process matrix uses
         self.spec = spec
         self.strategy_name = spec.overlay
         self.aggregation_name = spec.aggregation
@@ -44,7 +55,7 @@ class ControllerState:
         self.trim_alpha = spec.trim_alpha
         self.verbose = verbose
 
-        # svet se sklapa istom funkcijom kao u in-process matrici (core/setup.py)
+        # the world is assembled by the same function as in the in-process matrix (core/setup.py)
         world = build_world(spec)
         self.cfg = world.cfg
         self.id_params = world.id_params
@@ -63,17 +74,16 @@ class ControllerState:
         self.rng = rng if rng is not None else make_rng(spec.seed, "attack")
 
         self.peers_in = {}
-        self.offers = {} # kes kandidata 
+        self.offers = {} # candidate cache
         self.offers_done = set()
-        self.broadcasts = {}
         self.reports = {}
-        self.recorded = {0} # runda 0 se belezi ispod, mora da udje da bi complete() bio tacan
+        self.recorded = {0} # round 0 is recorded below; it must be in here for complete() to be right
         self.stubs = {i: _Stub(a["peers"], a["x_local"]) for i, a in self.assignments.items()}
         self.metrics = ExperimentMetrics(x_star=self.x_star,
                                          num_buckets=world.id_params.num_buckets,
                                          per_node=spec.per_node_metrics)
         self.trace = EventTrace() if spec.trace_events else None
-        self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # ubelezi rundu 0 (pocetno stanje, prazni brojaci)
+        self.metrics.record(0, self.stubs, self.scenario, RoundCounters()) # record round 0 (initial state, empty counters)
         self.lock = threading.Lock()
 
     def config_payload(self):
@@ -118,12 +128,18 @@ class ControllerState:
         }
 
     def maybe_build_offers(self, r):
-        # ako su kandidati za ovu rundu vec napravljeni, ili jos nisu svi cvorovi prijavili komsije — izadji
+        # if the candidates for this round are already built, or not every node has
+        # reported its peers yet - leave
         if r in self.offers_done or len(self.peers_in.get(r, {})) < self.n:
             return
         for i in range(self.n):
             view = _OfferView(i, self.peers_in[r][i])
-            self.offers[(r, i)] = self.scenario.offer_candidates(view, r, self.rng)
+            # 5.1.5: the offer is sent as an (identity, nonce) pair, because the
+            # nonce is part of the offer itself - the identity advertising itself
+            # attaches its own PoW. The node therefore looks it up in no registry;
+            # it reads what arrived.
+            self.offers[(r, i)] = [[c, self.nonces.get(c)]
+                                   for c in self.scenario.offer_candidates(view, r, self.rng)]
         self.offers_done.add(r)
 
     def maybe_record(self, r):
@@ -141,27 +157,30 @@ class ControllerState:
             rej_low_score=agg("rej_low_score"), rej_bucket_full=agg("rej_bucket_full"),
             timeouts=agg("timeouts"))
         if self.trace is not None:
-            # aktivacija napada je dogadjaj sistema, belezi je controller jednom
+            # the attack activation is a system event; the controller records it once
             if r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
-            vracanja = self.scenario.returning_count(r)
-            if vracanja:
-                self.trace.churn_reset(r, vracanja)
-            # napadacke emisije zna controller (njemu stizu), pa ih on i belezi
+            returns = self.scenario.returning_count(r)
+            if returns:
+                self.trace.churn_reset(r, returns)
+            # 5.1.5: malicious values no longer pass through the controller -
+            # they go straight from the attacker to its neighbours. For the event
+            # log the controller derives them from the scenario it already holds,
+            # exactly as emitted_values does in the in-process path.
             if self.scenario.active(r):
-                sent = self.broadcasts.get(r, {})
                 for m in sorted(self.scenario.malicious_ids):
-                    if m in sent and sent[m] is not None:
+                    value = self.scenario.broadcast_value(m, 0.0, r)
+                    if value is not NO_MESSAGE:
                         self.trace.malicious_broadcast(
-                            r, m, sent[m], self.scenario.params.byzantine_profile)
-            # dogadjaji stizu od cvorova; redosled je po id-u radi determinizma
+                            r, m, value, self.scenario.params.byzantine_profile)
+            # events come from the nodes; the order is by id, for determinism
             for i in range(self.n):
                 for row in (rep[i].get("trace") or []):
                     self.trace.events.append(_row_to_event(row))
         m = self.metrics.record(r, self.stubs, self.scenario, counters)
         self.recorded.add(r)
         if self.verbose:
-            print(f"  runda {r:3d}/{self.num_rounds}: err={m.err_rel:.4e} "
+            print(f"  round {r:3d}/{self.num_rounds}: err={m.err_rel:.4e} "
                   f"sybil_pen={m.sybil_penetration:.3f} timeouts={counters.timeouts}", flush=True)
 
     def complete(self):

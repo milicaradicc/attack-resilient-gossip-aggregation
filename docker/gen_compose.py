@@ -30,6 +30,9 @@ def generate(args):
                   "    build:", "      context: ..", "      dockerfile: docker/Dockerfile",
                   "    environment:", "      ROLE: node", f"      NODE_ID: \"{i}\"",
                   f"      CONTROLLER_URL: http://controller:{args.port}",
+                  # 5.1.5: svaki cvor podize sopstveni server za vrednosti, pa
+                  # susedi vrednosti uzimaju direktno od njega
+                  f"      NODE_PORT: \"{args.node_port}\"",
                   "    depends_on:", "      - controller"]
     return "\n".join(lines) + "\n", total, len(specs)
 
@@ -42,6 +45,8 @@ def main():
     p.add_argument("--matrix-out", default=None,
                    help="izlazni CSV; podrazumevano results/docker/<naziv>.csv")
     p.add_argument("--port", type=int, default=d["docker_port"])
+    p.add_argument("--node-port", type=int, default=d.get("docker_node_port", 8100),
+                   help="port na kome svaki cvor sluzi svoju vrednost susedima")
     p.add_argument("--out", default=d["docker_compose_out"])
     a = p.parse_args()
     if a.matrix_out is None:

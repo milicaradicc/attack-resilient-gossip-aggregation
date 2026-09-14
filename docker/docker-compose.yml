@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       ROLE: "controller"
-      MATRIX_CONFIG: "configs/tiny.json"
-      MATRIX_OUT: "results/docker/tiny.csv"
+      MATRIX_CONFIG: "configs/smoke.json"
+      MATRIX_OUT: "results/docker/smoke.csv"
       PORT: "8000"
     ports:
       - "8000:8000"
@@ -20,6 +20,7 @@ services:
       ROLE: node
       NODE_ID: "0"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node1:
@@ -30,6 +31,7 @@ services:
       ROLE: node
       NODE_ID: "1"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node2:
@@ -40,6 +42,7 @@ services:
       ROLE: node
       NODE_ID: "2"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node3:
@@ -50,6 +53,7 @@ services:
       ROLE: node
       NODE_ID: "3"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node4:
@@ -60,6 +64,7 @@ services:
       ROLE: node
       NODE_ID: "4"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node5:
@@ -70,6 +75,7 @@ services:
       ROLE: node
       NODE_ID: "5"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node6:
@@ -80,6 +86,7 @@ services:
       ROLE: node
       NODE_ID: "6"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node7:
@@ -90,6 +97,7 @@ services:
       ROLE: node
       NODE_ID: "7"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node8:
@@ -100,6 +108,7 @@ services:
       ROLE: node
       NODE_ID: "8"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller
   node9:
@@ -110,5 +119,50 @@ services:
       ROLE: node
       NODE_ID: "9"
       CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node10:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "10"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node11:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "11"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node12:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "12"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node13:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "13"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
     depends_on:
       - controller

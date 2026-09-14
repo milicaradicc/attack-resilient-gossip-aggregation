@@ -36,8 +36,20 @@ class MatrixState:
 
         self.lock = threading.Lock()
         self.max_nodes = max(s.n_honest + sum(s.malicious_counts()) for s in self.specs) # za kontejnere
+        self.addresses = {}
         self.extra = varying_fields(self.specs) # za ablaciju
         self.config_fields = CONFIG_FIELDS + self.extra
+
+    def register_address(self, node_id: int, url: str) -> None:
+        with self.lock:
+            self.addresses[int(node_id)] = url
+
+    def all_addresses(self):
+
+        with self.lock:
+            if len(self.addresses) < self.max_nodes:
+                return None
+            return {str(k): v for k, v in self.addresses.items()}
 
     def state_for(self, job: int) -> ControllerState:
         with self.lock: # da se ne napravi vise statea

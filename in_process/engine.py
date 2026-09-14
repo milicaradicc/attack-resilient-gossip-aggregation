@@ -6,9 +6,6 @@ from metrics.experiment_metrics import RoundCounters
 
 
 class Engine:
-    # in-process runner: feeds the shared per-node logic (core/round_ops.py) with
-    # data held in memory; the distributed version (docker/node.py) feeds those
-    # same functions with data received over HTTP
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
                  nonces, timeout_rounds: int = 0, trace=None):
         self.nodes = nodes
@@ -18,10 +15,6 @@ class Engine:
         self.num_rounds = num_rounds
         self.metrics = metrics
         self.rng = rng
-        # nonces: every identity has already solved its own PoW (World.nonces);
-        # here this only serves to assemble the peer_exchange message the candidate
-        # "sends" - admission (sampling) never reads this, only what arrives in the
-        # message itself (see core/round_ops.py)
         self.nonces = nonces
         self.timeout_rounds = timeout_rounds
         self.trace = trace # 5.1.8: optional event log
@@ -29,13 +22,12 @@ class Engine:
     def _discover(self, round_now, transport=None):
         offered = 0
         reasons = round_ops.empty_reasons()
-        # 5.1.5: discovery is an exchange - first every node sends a request and
-        # receives offers, and only then does everyone decide. That way delivery of
-        # offers does not depend on processing order, same as for values.
+        for node in self.nodes.values():
+            round_ops.send_peer_request(node, round_now, transport=transport)
         for node in self.nodes.values():
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)
-            round_ops.request_peers(node, candidates, round_now, transport=transport,
-                                    nonces=self.nonces)
+            offers = [(c, self.nonces.get(c)) for c in candidates]
+            round_ops.receive_offers(node, offers, round_now, transport=transport)
         for node in self.nodes.values():
             n_off, _, node_reasons = round_ops.admit(node, self.sampling, round_now,
                                                      trace=self.trace,
@@ -46,7 +38,6 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
-        # values are frozen before delivery (tick barrier)
         return round_ops.emitted_values(self.nodes, self.scenario, round_now,
                                         trace=self.trace)
 
@@ -60,8 +51,6 @@ class Engine:
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
 
         for r in range(1, self.num_rounds + 1):
-            # churn: identities returning in this round start over as far as
-            # everyone else is concerned (their log at other nodes is wiped)
             self.scenario.before_round(self.nodes, r, trace=self.trace)
             if self.trace is not None:
                 comebacks = self.scenario.returning_count(r)
@@ -69,29 +58,26 @@ class Engine:
                     self.trace.churn_reset(r, comebacks)
             if self.trace is not None and r == self.scenario.params.activate_round:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
-            # discovery + admission
-            # 5.1.5: every message of the round goes through the transport layer
             transport = Transport()
-            offered, rejected, reasons = self._discover(r, transport=transport)
-            # snapshot taken at the start of the round
-            emitted = self._emit(r) # values of all participants, attackers included
+
+            emitted = self._emit(r) 
             own = {hid: n.estimate for hid, n in self.nodes.items()}
 
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng) # peers for this exchange
+                peers = self.sampling.select_gossip_peers(node, self.rng) 
                 responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
-                # every neighbour sends its value to this node as a separate message;
-                # the receiver takes it out of its mailbox and reads the value from it
                 round_ops.deliver(node, responders, emitted, r, transport=transport)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)
-                node.estimate = self.aggregation.aggregate(own[hid], received) # new estimate
+                node.estimate = self.aggregation.aggregate(own[hid], received) 
                 if self.trace is not None:
                     self.trace.estimate(r, hid, node.estimate)
+
+            offered, rejected, reasons = self._discover(r, transport=transport)
 
             counters = RoundCounters(
                 data_msgs=transport.data, control_msgs=transport.control,

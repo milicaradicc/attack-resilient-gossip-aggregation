@@ -3,12 +3,29 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+# The HTTP layer: the only point at which the controller touches the network.
+# The handler holds no experiment logic - it only translates requests into calls
+# on the matrix state, and answers 425 while a barrier condition is not met.
+#
+# 5.1.5: aggregation values do NOT pass through here. Every participant runs its
+# own value server (docker/value_server.py) and neighbours fetch from each other
+# directly. What the controller still provides is:
+#
+#   - the job description and the initial assignment
+#   - the peer sampling service (POST /peers, GET /offers), which needs a
+#     barrier because the candidate offer is built for all nodes at once
+#   - the address directory (POST /address, GET /addresses), the equivalent of
+#     a bootstrap node or DNS: it tells a node where its neighbours live, not
+#     what they are saying
+#   - metric collection (POST /report)
+
+
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
     request_queue_size = 256
 
 
-def make_handler(matrix: MatrixState):
+def make_handler(matrix):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):
             pass
@@ -35,6 +52,19 @@ def make_handler(matrix: MatrixState):
                 job, i = int(parts[1]), int(parts[2])
                 st = matrix.state_for(job)
                 self._send(200, {"node_id": i, **st.assignments[i]})
+            elif parts[0] == "addresses":
+                # the directory is complete only once every participant has
+                # registered; until then a node cannot reach all its neighbours
+                addresses = matrix.all_addresses()
+                self._send(200 if addresses is not None else 425,
+                           {"addresses": addresses} if addresses is not None
+                           else {"ready": False})
+            elif parts[0] == "finished":
+                # a participant must keep its value server up until every job is
+                # done: a slower neighbour may still be collecting an earlier
+                # round from it
+                done = matrix.done()
+                self._send(200 if done else 425, {"done": done})
             elif parts[0] == "offers":
                 job, i, r = int(parts[1]), int(parts[2]), int(parts[3])
                 st = matrix.state_for(job)
@@ -50,25 +80,16 @@ def make_handler(matrix: MatrixState):
         def do_POST(self):
             parts = self.path.strip("/").split("/")
             data = self._body()
+            if parts[0] == "address":
+                matrix.register_address(data["node_id"], data["url"])
+                self._send(200, {"ok": True})
+                return
             job = data.get("job", 0)
             st = matrix.state_for(job)
             if parts[0] == "peers":
                 with st.lock:
                     st.peers_in.setdefault(data["round"], {})[data["node_id"]] = data["peers"]
                 self._send(200, {"ok": True})
-            elif parts[0] == "broadcast":
-                with st.lock:
-                    st.broadcasts.setdefault(data["round"], {})[data["node_id"]] = data["value"]
-                self._send(200, {"ok": True})
-            elif parts[0] == "values":
-                r = data["round"]
-                with st.lock:
-                    ready = len(st.broadcasts.get(r, {})) == st.n_total
-                    b = st.broadcasts.get(r, {})
-                    # zadrzane poruke (delay) imaju vrednost None i ne isporucuju se
-                    out = ({str(p): b[p] for p in data["peers"]
-                            if p in b and b[p] is not None} if ready else None)
-                self._send(200 if ready else 425, {"values": out} if ready else {"ready": False})
             elif parts[0] == "report":
                 with st.lock:
                     st.reports.setdefault(data["round"], {})[data["node_id"]] = data
@@ -81,11 +102,6 @@ def make_handler(matrix: MatrixState):
                 self._send(404, {})
 
     return Handler
-
-
-def serve(matrix: MatrixState, host: str, port: int):
-    return _Server((host, port), make_handler(matrix))
-
 
 
 def serve(matrix, host: str, port: int):

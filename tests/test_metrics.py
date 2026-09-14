@@ -103,13 +103,26 @@ def test_convergence_time_measured_from_given_round():
     # 6.3.2: T = min{t : E(t) < eps}, pri cemu merenje pocinje od zadate runde.
     # Bez toga bi se merila konvergencija tokom warmup faze i rezultat bi bio
     # isti bez obzira na napad.
+    #
+    # Merenje krece od activate_round + 1, a ne od same runde aktivacije. Razlog
+    # je redosled faza u rundi (5.1.4): cvor prvo razmenjuje vrednosti sa peer
+    # set-om koji vec ima, pa tek onda peer sampling menja taj set za narednu
+    # rundu. U rundi activate_round napadaci se prvi put nude i primaju, ali je
+    # razmena te runde vec obavljena sa cistim peer set-om — njihov uticaj
+    # pocinje tek od naredne runde.
     spec = spec_from(n_honest=20, beta=0.3, overlay="random",
                      aggregation="trimmed_mean", seed=1)
     metrics = run_single(spec)
     od_pocetka = metrics.convergence_time(spec.epsilon, since=1)
-    od_napada = metrics.convergence_time(spec.epsilon, since=spec.activate_round)
+    od_napada = metrics.convergence_time(spec.epsilon, since=spec.activate_round + 1)
     assert od_pocetka >= 1, "tokom warmup-a sistem konvergira"
     assert od_napada == -1, "pod napadom bez zastite ne sme konvergirati"
+    # runda aktivacije je jos uvek cista: napadaci su primljeni, ali tek na
+    # kraju runde, pa u njoj nisu ucestvovali u razmeni
+    aktivacija = next(r for r in metrics.rows if r.round == spec.activate_round)
+    posle = next(r for r in metrics.rows if r.round == spec.activate_round + 1)
+    assert aktivacija.err_rel < spec.epsilon, "runda aktivacije vec pokazuje napad"
+    assert posle.err_rel > aktivacija.err_rel * 10, "napad se ne vidi ni posle aktivacije"
 
 
 def test_convergence_time_returns_sentinel_when_never_reached():

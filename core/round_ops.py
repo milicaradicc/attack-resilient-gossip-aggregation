@@ -16,14 +16,14 @@ def empty_reasons() -> Dict[str, int]:
 
 def observe(node, other: int, round_now: int, exchanged: bool, nonce: int = None) -> None:
     obs = node.observations.get(other)
-    # ako peer nije vidjen ranije dodaj observation; nonce je ono sto je peer
-    # sam predstavio u ponudi (videti request_peers/transport.offer) — ostaje
-    # zapamcen uz njega, ne trazi se ponovo iz nekog registra
+    # if the peer has not been seen before, add an observation; the nonce is what
+    # the peer itself presented in its offer (see receive_offers/transport.offer)
+    # and stays remembered with it, never looked up again from any registry
     if obs is None:
         node.observations[other] = Observation(
             first_seen_round=round_now, last_seen_round=round_now,
             successful_exchanges=1 if exchanged else 0, nonce=nonce)
-    # ako jeste ziv je i osvezava se
+    # otherwise it is alive, so refresh it
     else:
         obs.last_seen_round = round_now
         if exchanged:
@@ -31,30 +31,42 @@ def observe(node, other: int, round_now: int, exchanged: bool, nonce: int = None
             obs.missed_heartbeats = 0
 
 
-def request_peers(node, candidates: List[int], round_now: int,
-                  transport=None, nonces: Dict[int, int] = None) -> None:
-    # 5.1.5: discovery kao razmena — cvor salje zahtev, a odgovor stize kao niz
-    # peer_exchange poruka, po jedna za svakog ponudjenog kandidata. Izvor svake
-    # ponude je sam identitet koji se reklamira, a poruka nosi i njegov PoW
-    # nonce — 'nonces' ovde nije registar kome se admission obraca, nego samo
-    # nacin da se u simulaciji sastavi ta poruka (honest cvor bi nonce citao
-    # sam iz sebe; ovde ga za sve identitete drzi Engine/World jednom, o
-    # nonce se pri admisiji nikad ne pita — samo se cita ono sto stigne u poruci)
+def send_peer_request(node, round_now: int, transport=None) -> None:
+    # 5.1.5, first half of discovery: the node SENDS the request and at that point
+    # knows nothing more. Who the candidates are is decided outside of it, and the
+    # answer only arrives in the second half (receive_offers), as messages.
+    #
+    # The request has no destination among the nodes: it is addressed to the peer
+    # sampling service (the controller in the distributed path, the Engine in the
+    # in-process one), which is not a participant in the aggregation. Transport
+    # counts such a message but has nobody to deliver it to - see Transport.send.
     if transport is None:
         return
-    transport.request_peers(round_now, node.node_id, node.node_id)
-    nonces = nonces or {}
-    for candidate in candidates:
-        transport.offer(round_now, candidate, node.node_id, nonce=nonces.get(candidate))
+    transport.request_peers(round_now, node.node_id, None)
+
+
+def receive_offers(node, offers, round_now: int, transport=None) -> None:
+    # 5.1.5, second half: the offers ARRIVE. Each one is a separate peer_exchange
+    # message whose source is the identity advertising itself, carrying that
+    # identity's PoW nonce as its payload. From here on the node knows only what
+    # landed in its mailbox - no registry of identities or nonces is consulted.
+    #
+    # 'offers' is what came off the wire: a list of (identity, nonce) pairs. A bare
+    # id is accepted as well, for tests that do not model PoW.
+    if transport is None:
+        return
+    for offer in offers:
+        candidate, nonce = offer if isinstance(offer, (tuple, list)) else (offer, None)
+        transport.offer(round_now, candidate, node.node_id, nonce=nonce)
 
 
 def admit(node, sampling, round_now: int, offered: List = None,
           trace=None, transport=None) -> Tuple[int, int, Dict[str, int]]:
-    # admission + eviction za JEDAN cvor. Kandidati (id, nonce) parovi se
-    # preuzimaju iz sanduceta, gde su stigli kao odgovor na zahtev (videti
-    # request_peers) — nonce je deo same poruke, ne trazi se nigde spolja.
-    # Lista 'offered' koristi se samo kada transport nije zadat (npr. u
-    # testovima) i moze biti gola lista id-jeva (bez PoW-a) ili (id, nonce) parova.
+    # admission + eviction for ONE node. The candidates, as (id, nonce) pairs, are
+    # taken out of the mailbox where they arrived as the answer to the request
+    # (see receive_offers) - the nonce is part of the message itself and is never
+    # looked up anywhere else. The 'offered' list is used only when no transport is
+    # given (e.g. in tests) and may be a bare list of ids (no PoW) or (id, nonce) pairs.
     if transport is not None:
         exchanges = [(m.source, m.payload) for m in transport.receive(
             node.node_id, messages.PEER_EXCHANGE)]
@@ -68,21 +80,20 @@ def admit(node, sampling, round_now: int, offered: List = None,
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
     for candidate, nonce in exchanges:
-        # zabelezi u dnevnik (vidjanje, ne razmena) -> time mu starost pocinje da tece
+        # record it in the log (a sighting, not an exchange) -> its age starts running
         observe(node, candidate, round_now, exchanged=False, nonce=nonce)
-        # ako je kandidat vec komsija skip
+        # if the candidate is already a neighbour, skip
         if candidate in node.peers:
             continue
-        # admission !!!!!!!!!!!! -> proverava PoW/starost/skor/bucket
+        # admission -> checks PoW / age / score / bucket
         if sampling.accept_peer(node, candidate, round_now):
-            # strategija odlucuje koga (i da li) izbaciti:
-            # eclipse vraca najslabijeg iz istog bucketa kad je bucket pun,
-            # ostale strategije globalno najslabijeg tek kad je ceo peer set pun
+            # the strategy decides who (if anyone) to evict:
+            # eclipse returns the weakest from the same bucket once that bucket is full,
+            # the other strategies the globally weakest only once the whole peer set is full
             victim = sampling.evict_peer(node, round_now, candidate)
             if victim is not None:
+                # eviction sends no message: it is a local decision (see core/transport.py)
                 node.peers.remove(victim)
-                if transport is not None:
-                    transport.evict(round_now, node.node_id, victim, "replaced_by")
                 if trace is not None:
                     trace.evict(round_now, node.node_id, victim, "replaced_by", candidate)
             elif len(node.peers) >= sampling.max_peers:
@@ -95,7 +106,7 @@ def admit(node, sampling, round_now: int, offered: List = None,
             if trace is not None:
                 trace.accept(round_now, node.node_id, candidate)
         else:
-            # povecaj brojace
+            # bump the counters
             why = sampling.reason(node, candidate, round_now) or "self_or_duplicate"
             reasons[why] = reasons.get(why, 0) + 1
             if transport is not None:
@@ -106,13 +117,24 @@ def admit(node, sampling, round_now: int, offered: List = None,
 
 
 def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
-              timeout_rounds: int, trace=None, transport=None) -> Tuple[List[int], int]:
-    # ko odgovara ostaje u razmeni, ko cuti skuplja propustene otkucaje
+              timeout_rounds: int, trace=None, transport=None,
+              responds_fn=None) -> Tuple[List[int], int]:
+    # whoever answers stays in the exchange; whoever stays silent accumulates
+    # missed heartbeats
+    #
+    # 'responds_fn' says how "did this peer answer" is decided. In the in-process
+    # path there is nobody to ask, so the scenario answers on the peer's behalf.
+    # In the distributed path the node learns it from the peer itself: the answer
+    # came back over the wire, or it did not (docker/node.py). Both must agree,
+    # because the attacker container evaluates the very same scenario rule on its
+    # own identity - the difference is only who evaluates it.
+    answered = responds_fn if responds_fn is not None else (
+        lambda peer: scenario.responds(peer, round_now, rng))
     responders = []
     for p in peers:
         if transport is not None:
             transport.probe(round_now, node.node_id, p)
-        if scenario.responds(p, round_now, rng):
+        if answered(p):
             observe(node, p, round_now, exchanged=True)
             responders.append(p)
         else:
@@ -120,7 +142,7 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
             if obs is not None:
                 obs.missed_heartbeats += 1
                 obs.missed_total += 1
-    # timeout eviction: peer koji predugo cuti se izbacuje iz peer set-a
+    # timeout eviction: a peer that stays silent too long is dropped from the peer set
     timeouts = 0
     if timeout_rounds > 0:
         for p in list(node.peers):
@@ -129,8 +151,6 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
                 node.peers.remove(p)
                 obs.timeout_count += 1
                 timeouts += 1
-                if transport is not None:
-                    transport.evict(round_now, node.node_id, p, "timeout")
                 if trace is not None:
                     trace.evict(round_now, node.node_id, p, "timeout", None)
                 if p in responders:
@@ -140,16 +160,17 @@ def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
 
 def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
                    trace=None) -> Dict[int, float]:
-    # 5.1.4: vrednosti svih ucesnika zamrzavaju se na pocetku runde (tick barrier),
-    # pa se tek onda isporucuju. Time isporuka ne zavisi od redosleda obrade cvorova.
+    # 5.1.4: the values of all participants are frozen at the start of the round
+    # (tick barrier) and only then delivered. Delivery therefore does not depend
+    # on the order in which nodes are processed.
     out = {}
     for hid, node in nodes.items():
         out[hid] = scenario.broadcast_value(hid, node.estimate, round_now)
-    for m in sorted(scenario.malicious_ids): # fiksan redosled radi determinizma
-        # placeholder 0.0 se ne koristi — napadac vraca vrednost po svom profilu
+    for m in sorted(scenario.malicious_ids): # fixed order, for determinism
+        # the 0.0 placeholder is not used - the attacker returns a value from its profile
         value = scenario.broadcast_value(m, 0.0, round_now)
         if value is NO_MESSAGE:
-            # poruka je zadrzana (delay); ovaj ucesnik u ovoj rundi ne salje nista
+            # the message was held back (delay); this participant sends nothing this round
             continue
         out[m] = value
         if trace is not None and scenario.active(round_now):
@@ -160,9 +181,9 @@ def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
 
 def deliver(node, responders: List[int], emitted: Dict[int, float],
             round_now: int, transport=None) -> List[int]:
-    # 5.1.5: svaki sused koji je odgovorio salje svoju vrednost kao zasebnu
-    # data poruku ovom cvoru. Lazni identiteti (flooding) nemaju emitovanu
-    # vrednost, pa ne salju nista.
+    # 5.1.5: every neighbour that answered sends its value to this node as a
+    # separate data message. Fake identities (flooding) have no emitted value, so
+    # they send nothing.
     senders = [p for p in responders if p in emitted]
     if transport is not None:
         for p in senders:
