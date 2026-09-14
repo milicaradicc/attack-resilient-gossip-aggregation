@@ -4,7 +4,7 @@ import random
 from typing import Optional
 
 from attacks.base import AttackContext, BaseAttack, module_rng
-
+from attacks.base import NO_MESSAGE
 
 class SelectiveForwardingAttack(BaseAttack):
     name = "selective_forwarding"
@@ -18,8 +18,7 @@ class SelectiveForwardingAttack(BaseAttack):
         if p.selective_p >= 1.0 or identity not in ctx.malicious_ids:
             return None
         r = module_rng(ctx, identity, round_now, "selective")
-        # sa verovatnocom (1 - selective_p) napadac emituje korektnu vrednost
-        return p.x_star if r.random() > p.selective_p else None
+        return None if r.random() > p.selective_p else NO_MESSAGE
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
         p = ctx.params
