@@ -130,6 +130,25 @@ def test_distributed_churn_matches_inprocess():
     assert abs(d.sybil_penetration - i.sybil_penetration) < 1e-9
 
 
+def test_unresponsive_attacker_is_silent_in_both_paths():
+    from core.config import spec_from
+    common = dict(n_honest=12, beta=0.3, overlay="random", aggregation="mean",
+                  seed=1, num_rounds=15, activate_round=1, pow_difficulty_bits=8,
+                  timeout_rounds=3)
+    spec = spec_from(unresponsive_p=0.8, **common)
+    d = _distributed(spec)
+    i = run_single(spec).rows[-1]
+    assert abs(d.err_rel - i.err_rel) < 1e-9
+    assert abs(d.sybil_penetration - i.sybil_penetration) < 1e-9
+
+    silent = run_single(spec)
+    talking = run_single(spec_from(unresponsive_p=0.0, **common))
+    assert sum(r.timeouts for r in silent.rows) > 0, (
+        "an unresponsive attacker never triggered a timeout")
+    assert sum(r.data_msgs for r in silent.rows) < sum(
+        r.data_msgs for r in talking.rows), "silence did not reduce the value traffic"
+
+
 def test_reported_peer_set_is_the_post_churn_one():
     from core.config import spec_from
     spec = spec_from(n_honest=12, beta=0.3, overlay="random", aggregation="mean",
@@ -169,5 +188,6 @@ if __name__ == "__main__":
     test_distributed_eclipse_matches_inprocess()
     test_distributed_delay_matches_inprocess()
     test_distributed_churn_matches_inprocess()
+    test_unresponsive_attacker_is_silent_in_both_paths()
     test_reported_peer_set_is_the_post_churn_one()
     print("OK - the distributed system (benign + attack) reproduces in-process")

@@ -45,10 +45,8 @@ def make_handler(store: ValueStore, node_id: int):
             job, round_now = int(parts[1]), int(parts[2])
             entry = store.get(job, round_now)
             if entry is None:
-                # not at this round yet - the caller retries
                 self._send(425, {"ready": False})
             elif not entry["responds"]:
-                # reached the round and refusing to answer
                 self._send(503, {})
             else:
                 self._send(200, {"node_id": node_id, "value": entry["value"]})

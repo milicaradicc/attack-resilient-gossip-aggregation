@@ -3,22 +3,6 @@ from __future__ import annotations
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-# The HTTP layer: the only point at which the controller touches the network.
-# The handler holds no experiment logic - it only translates requests into calls
-# on the matrix state, and answers 425 while a barrier condition is not met.
-#
-# 5.1.5: aggregation values do NOT pass through here. Every participant runs its
-# own value server (docker/value_server.py) and neighbours fetch from each other
-# directly. What the controller still provides is:
-#
-#   - the job description and the initial assignment
-#   - the peer sampling service (POST /peers, GET /offers), which needs a
-#     barrier because the candidate offer is built for all nodes at once
-#   - the address directory (POST /address, GET /addresses), the equivalent of
-#     a bootstrap node or DNS: it tells a node where its neighbours live, not
-#     what they are saying
-#   - metric collection (POST /report)
-
 
 class _Server(ThreadingHTTPServer):
     daemon_threads = True
@@ -53,16 +37,11 @@ def make_handler(matrix):
                 st = matrix.state_for(job)
                 self._send(200, {"node_id": i, **st.assignments[i]})
             elif parts[0] == "addresses":
-                # the directory is complete only once every participant has
-                # registered; until then a node cannot reach all its neighbours
                 addresses = matrix.all_addresses()
                 self._send(200 if addresses is not None else 425,
                            {"addresses": addresses} if addresses is not None
                            else {"ready": False})
             elif parts[0] == "finished":
-                # a participant must keep its value server up until every job is
-                # done: a slower neighbour may still be collecting an earlier
-                # round from it
                 done = matrix.done()
                 self._send(200 if done else 425, {"done": done})
             elif parts[0] == "offers":

@@ -34,8 +34,8 @@ class RunSpec:
     flooding: int
     churn_period: int
     selective_p: float
-    timeout_rounds: int
     unresponsive_p: float
+    timeout_rounds: int
     trim_alpha: float = 0.2
     age_min: int = 3
     age_max: int = 20

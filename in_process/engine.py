@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from attacks.base import NO_MESSAGE
 from core import messages, round_ops
 from core.transport import Transport
 from metrics.experiment_metrics import RoundCounters
@@ -38,16 +39,29 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
-        return round_ops.emitted_values(self.nodes, self.scenario, round_now,
-                                        trace=self.trace)
 
-    def _heartbeat(self, node, peers, round_now, transport=None):
-        return round_ops.heartbeat(node, peers, self.scenario, round_now,
-                                   self.rng, self.timeout_rounds, trace=self.trace,
-                                   transport=transport)
+        out = {}
+        for hid, node in self.nodes.items():
+            out[hid] = self.scenario.broadcast_value(hid, node.estimate, round_now)
+        for m in sorted(self.scenario.malicious_ids): 
+            value = self.scenario.broadcast_value(m, 0.0, round_now)
+            if value is NO_MESSAGE:
+                continue
+            out[m] = value
+            if self.trace is not None and self.scenario.active(round_now):
+                self.trace.malicious_broadcast(
+                    round_now, m, value, self.scenario.params.byzantine_profile)
+        return out
+
+    def _heartbeat(self, node, peers, round_now, emitted, transport=None):
+        def contact(peer):
+            if not self.scenario.responds(peer, round_now, self.rng):
+                return round_ops.NO_ANSWER
+            return emitted.get(peer)
+        return round_ops.heartbeat(node, peers, round_now, self.timeout_rounds,
+                                   contact, trace=self.trace, transport=transport)
 
     def run(self):
-        # record the initial round
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
 
         for r in range(1, self.num_rounds + 1):
@@ -66,14 +80,15 @@ class Engine:
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng) 
-                responders, t = self._heartbeat(node, peers, r, transport=transport)
+                peers = self.sampling.select_gossip_peers(node, self.rng) # peers for this exchange
+                responders, t, values = self._heartbeat(node, peers, r, emitted,
+                                                        transport=transport)
                 timeouts += t
-                round_ops.deliver(node, responders, emitted, r, transport=transport)
+                round_ops.deliver(node, responders, values, r, transport=transport)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)
-                node.estimate = self.aggregation.aggregate(own[hid], received) 
+                node.estimate = self.aggregation.aggregate(own[hid], received) # new estimate
                 if self.trace is not None:
                     self.trace.estimate(r, hid, node.estimate)
 

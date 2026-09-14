@@ -10,10 +10,7 @@ class DelayAttack(BaseAttack):
     name = "delay"
 
     def __init__(self):
-        # red poruka: runda isporuke -> {identitet: vrednost}
         self.queue: Dict[int, Dict[int, float]] = {}
-        # zadrzava se ono sto bi napadac stvarno poslao po svom profilu,
-        # pa isporucena poruka nosi vrednost iz trenutka kada je nastala
         self._profil = ByzantineAttack()
 
     def enabled(self, ctx: AttackContext) -> bool:
@@ -24,7 +21,6 @@ class DelayAttack(BaseAttack):
         if ctx.params.delay_rounds <= 0 or identity not in ctx.malicious_ids:
             return None
 
-        # ako je nesto dospelo za ovu rundu, isporucuje se sada
         due = self.queue.get(round_now, {})
         held = due.pop(identity, None)
         if not due:
@@ -32,8 +28,8 @@ class DelayAttack(BaseAttack):
 
         # tekuca vrednost se odlaze za kasnije
         delivery = round_now + ctx.params.delay_rounds
-        sada = self._profil.broadcast_value(ctx, identity, value, round_now)
-        self.queue.setdefault(delivery, {})[identity] = sada
+        now = self._profil.broadcast_value(ctx, identity, value, round_now)
+        self.queue.setdefault(delivery, {})[identity] = now
 
         # dok nista nije dospelo, cvor od ovog suseda ne dobija poruku
         return held if held is not None else NO_MESSAGE
