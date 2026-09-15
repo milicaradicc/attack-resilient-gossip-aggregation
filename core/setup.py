@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from statistics import mean
 from typing import Dict, Set
@@ -54,9 +55,23 @@ def solve_nonces(ids: Set[int], params: IdentityParams) -> Dict[int, int]:
 def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
     if beta <= 0.0:
         return 0, 0
-    n_mal = round(n_honest * beta / (1.0 - beta))
-    n_byzantine = round(n_mal * byzantine_fraction)
+    exact = n_honest * beta / (1.0 - beta)
+    lo = int(math.floor(exact))
+    hi = lo + 1
+    realized = lambda k: k / (n_honest + k) if n_honest + k else 0.0
+    n_mal = hi if abs(realized(hi) - beta) <= abs(realized(lo) - beta) else lo
+    n_mal = max(n_mal, 1)
+
+    n_byzantine = int(math.floor(n_mal * byzantine_fraction + 0.5))
+    if byzantine_fraction > 0.0:
+        n_byzantine = max(n_byzantine, 1)
+    n_byzantine = min(n_byzantine, n_mal)
     return n_byzantine, n_mal - n_byzantine
+
+
+def realized_beta(n_honest: int, n_malicious: int) -> float:
+    total = n_honest + n_malicious
+    return n_malicious / total if total else 0.0
 
 
 @dataclass

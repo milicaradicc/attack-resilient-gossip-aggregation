@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
 from core.setup import malicious_counts as core_malicious_counts
+from core.setup import realized_beta as core_realized_beta
 
 DEFAULTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                              "configs", "defaults.json")
@@ -63,6 +64,15 @@ class RunSpec:
 
     def malicious_counts(self) -> Tuple[int, int]:
         return core_malicious_counts(self.n_honest, self.beta, self.byzantine_fraction)
+
+    @property
+    def n_malicious(self) -> int:
+        f, s = self.malicious_counts()
+        return f + s
+
+    @property
+    def realized_beta(self) -> float:
+        return core_realized_beta(self.n_honest, self.n_malicious)
 
 
 def load_defaults(path: str = DEFAULTS_PATH) -> Dict[str, Any]:

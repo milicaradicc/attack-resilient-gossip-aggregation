@@ -88,14 +88,48 @@ def fig_final_error_bars(summary, beta, out_dir):
     plt.close(fig)
 
 
+def _realized(summary, nominal):
+    vals = [r["realized_beta"] for r in summary
+            if r.get("beta") == nominal and isinstance(r.get("realized_beta"), (int, float))]
+    return mean(vals) if vals else nominal
+
+
+def table_realized_beta(summary, out):
+    betas = sorted({r["beta"] for r in summary})
+    sizes = sorted({r["n_honest"] for r in summary})
+    lines = ["## Nominalna naspram realizovane bete", "",
+             "| N | " + " | ".join(f"b={b}" for b in betas) + " |",
+             "|" + "---|" * (len(betas) + 1)]
+    for n in sizes:
+        cells = []
+        for b in betas:
+            rows = [r for r in summary
+                    if r.get("n_honest") == n and r.get("beta") == b]
+            rb = [r["realized_beta"] for r in rows
+                  if isinstance(r.get("realized_beta"), (int, float))]
+            nb = [r["n_byzantine"] for r in rows
+                  if isinstance(r.get("n_byzantine"), (int, float))]
+            ns = [r["n_sybil"] for r in rows
+                  if isinstance(r.get("n_sybil"), (int, float))]
+            if rb:
+                cells.append(f"{mean(rb):.4f} (f={int(mean(nb))}, S={int(mean(ns))})")
+            else:
+                cells.append("-")
+        lines.append(f"| {n} | " + " | ".join(cells) + " |")
+    with open(out, "a") as f:
+        f.write("\n".join(lines) + "\n\n")
+
+
 def fig_penetration_vs_beta(summary, out_dir):
     betas = sorted({r["beta"] for r in summary})
     stats = group_stats(summary, ("overlay", "beta"), "final_sybil_penetration")
+    xs = [_realized(summary, b) for b in betas]
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for ov in OVERLAYS:
         ys = [stats.get((ov, b), (0.0, 0.0))[0] for b in betas]
-        ax.plot(betas, ys, marker="o", label=ov)
-    ax.set_xlabel("beta")
+        ax.plot(xs, ys, marker="o", label=ov)
+    ax.set_xlabel("realizovana beta (nominalna: " +
+                  ", ".join(str(b) for b in betas) + ")")
     ax.set_ylabel("Sybil penetration")
     ax.set_title("Sybil penetration vs malicious share")
     ax.legend()
@@ -1127,7 +1161,7 @@ def main() -> None:
     ablation = load(args.ablation) if os.path.exists(args.ablation) else []
     eclipse = load(eclipse_path) if os.path.exists(eclipse_path) else []
 
-    # tabele poglavlja 7, redom kako se u njemu pojavljuju
+    table_realized_beta(summary, args.tables)
     table_error_by_beta(summary, args.tables)
     table_profile_error(ablation, args.tables)
     table_profile_stability(ablation, args.tables)

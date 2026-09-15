@@ -19,6 +19,9 @@ from metrics.experiment_metrics import ExperimentMetrics
 CONFIG_FIELDS = ["n_honest", "beta", "overlay", "aggregation", "byzantine_profile", "seed"]
 
 SUMMARY_FIELDS = [
+    "realized_beta",
+    "n_byzantine",
+    "n_sybil",
     "final_err_rel", # 6.3.1 relativna greska agregacije
     "convergence_time", # 6.3.2 vreme konvergencije
     "recovery_time", # prva runda od koje greska trajno ostaje ispod praga
@@ -41,7 +44,11 @@ def summarize(spec, metrics: ExperimentMetrics) -> List:
     # jedno pokretanje svedeno na red sazetka; redosled prati SUMMARY_FIELDS
     last = metrics.rows[-1]
     b = metrics.rejection_breakdown()
+    n_byz, n_syb = spec.malicious_counts()
     return [
+        spec.realized_beta,
+        n_byz,
+        n_syb,
         last.err_rel,
         metrics.convergence_time(spec.epsilon, since=spec.activate_round),
         metrics.recovery_time(spec.epsilon, since=spec.activate_round),
