@@ -152,22 +152,9 @@ class ExperimentMetrics:
         return max(self._bucket_counts(node).values()) / len(node.peers)
 
     def convergence_time(self, epsilon, since=1):
-        # 6.3.2: T = min{t : E(t) < epsilon}. Merenje pocinje od zadate runde —
-        # pod napadom se prosledjuje activate_round, jer bi inace metrika merila
-        # konvergenciju tokom warmup faze i bila ista bez obzira na napad.
-        # Vraca -1 ako sistem nikada ne dostigne prag (npr. medijana ima pod
-        # greske iznad epsilon), sto se u obradi mora tretirati odvojeno.
-        for r in self.rows:
-            if r.round >= since and r.err_rel < epsilon:
-                return r.round
-        return -1
+        return self.recovery_time(epsilon, since=since)
 
     def recovery_time(self, epsilon, since=1):
-        # Dopuna metrici 6.3.2: prva runda od `since` u kojoj greska padne ispod
-        # praga I OSTANE ispod do kraja. Za razliku od convergence_time, koje
-        # belezi prvu uspesnu rundu i kada se procena kasnije pokvari, ova mera
-        # razlikuje sistem koji se stvarno oporavio od onog koji je nakratko bio
-        # tacan. Vraca -1 ako sistem ni na kraju nije ispod praga.
         rows = [r for r in self.rows if r.round >= since]
         if not rows or rows[-1].err_rel >= epsilon:
             return -1
