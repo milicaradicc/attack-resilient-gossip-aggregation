@@ -84,13 +84,13 @@ def admit(node, sampling, round_now: int, offered: List = None,
     return len(exchanges), sum(reasons.values()), reasons
 
 
-def heartbeat(node, peers: List[int], scenario, round_now: int, rng,
-              timeout_rounds: int, trace=None, transport=None) -> Tuple[List[int], int]:
+def heartbeat(node, peers: List[int], round_now: int, timeout_rounds: int,
+              responds, trace=None, transport=None) -> Tuple[List[int], int]:
     responders = []
     for p in peers:
         if transport is not None:
             transport.probe(round_now, node.node_id, p)
-        if scenario.responds(p, round_now, rng):
+        if responds(p):
             observe(node, p, round_now, exchanged=True)
             responders.append(p)
         else:

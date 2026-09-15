@@ -53,13 +53,10 @@ class Engine:
                     round_now, m, value, self.scenario.params.byzantine_profile)
         return out
 
-    def _heartbeat(self, node, peers, round_now, emitted, transport=None):
-        def contact(peer):
-            if not self.scenario.responds(peer, round_now, self.rng):
-                return round_ops.NO_ANSWER
-            return emitted.get(peer)
+    def _heartbeat(self, node, peers, round_now, transport=None):
         return round_ops.heartbeat(node, peers, round_now, self.timeout_rounds,
-                                   contact, trace=self.trace, transport=transport)
+                                   lambda p: self.scenario.responds(p, round_now, self.rng),
+                                   trace=self.trace, transport=transport)
 
     def run(self):
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
@@ -81,10 +78,9 @@ class Engine:
             timeouts = 0
             for hid, node in self.nodes.items():
                 peers = self.sampling.select_gossip_peers(node, self.rng) # peers for this exchange
-                responders, t, values = self._heartbeat(node, peers, r, emitted,
-                                                        transport=transport)
+                responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
-                round_ops.deliver(node, responders, values, r, transport=transport)
+                round_ops.deliver(node, responders, emitted, r, transport=transport)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)

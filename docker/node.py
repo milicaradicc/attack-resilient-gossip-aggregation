@@ -122,7 +122,8 @@ def run_honest(base, node_id, cfg, job, store, addresses):
                       responds=scenario.responds(node_id, r, None))
 
         responders, timeouts = round_ops.heartbeat(
-            node, list(node.peers), scenario, r, None, timeout_rounds,
+            node, list(node.peers), r, timeout_rounds,
+            lambda p: scenario.responds(p, r, None),
             trace=trace, transport=transport)
 
         values = {}
