@@ -1,0 +1,29 @@
+{
+  "n_honest": [
+    10,
+    15,
+    20
+  ],
+  "beta": [
+    0.3,
+    0.4,
+    0.5
+  ],
+  "overlay": [
+    "random",
+    "sybil_resistant",
+    "eclipse_resistant"
+  ],
+  "aggregation": [
+    "trimmed_mean"
+  ],
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "eclipse_targets": 3,
+  "per_node_metrics": true
+}

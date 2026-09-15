@@ -36,6 +36,7 @@ SUMMARY_FIELDS = [
     "rej_bucket",
     "final_sybil_penetration", # 6.3.4 sybil penetration
     "final_eclipse_rate", # 6.3.5 eclipse success rate
+    "final_isolation", # D3: stepen izolacije (udeo napadackih peer-ova)
 ]
 # 6.3.6 peer diversity se belezi po rundi (FIELDS), ne u sazetku
 
@@ -60,6 +61,7 @@ def summarize(spec, metrics: ExperimentMetrics) -> List:
         b["pow"], b["age"], b["score"], b["bucket"],
         last.sybil_penetration,
         last.eclipse_rate,
+        last.isolation,
     ]
 
 
