@@ -156,6 +156,7 @@ def build_world(spec) -> World:
             eclipse_targets=spec.eclipse_targets,
             delay_rounds=spec.delay_rounds,
             partition_groups=spec.partition_groups,
+            poisoning=spec.poisoning,
         ))
 
     scenario.attacker_nodes = attackers

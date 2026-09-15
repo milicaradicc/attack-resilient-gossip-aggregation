@@ -55,6 +55,7 @@ class RunSpec:
     low_bias: float = 5.0
     eclipse_targets: int = 0
     partition_groups: int = 0
+    poisoning: bool = True
     gossip_fanout: int = 0
     refresh_period: int = 0
     delay_rounds: int = 0
@@ -120,13 +121,13 @@ def _spec_fields(c, override=None):
         value_high=c["value_high"], discovery_offers=c["discovery_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
-        eclipse_targets=c["eclipse_targets"], partition_groups=c["partition_groups"], gossip_fanout=c["gossip_fanout"], refresh_period=c["refresh_period"], delay_rounds=c["delay_rounds"], churn_offline=c["churn_offline"],
+        eclipse_targets=c["eclipse_targets"], partition_groups=c["partition_groups"], poisoning=c["poisoning"], gossip_fanout=c["gossip_fanout"], refresh_period=c["refresh_period"], delay_rounds=c["delay_rounds"], churn_offline=c["churn_offline"],
         per_node_metrics=c["per_node_metrics"], trace_events=c["trace_events"],
     )
 
 
 SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds", "churn_offline", "discovery_offers",
-             "eclipse_targets", "partition_groups", "gossip_fanout", "refresh_period", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
+             "eclipse_targets", "partition_groups", "poisoning", "gossip_fanout", "refresh_period", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
 
 
 def _sweep_values(c, key, base):

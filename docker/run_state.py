@@ -117,6 +117,7 @@ class ControllerState:
                 "eclipse_targets": self.params.eclipse_targets,
                 "delay_rounds": self.params.delay_rounds,
                 "partition_groups": self.params.partition_groups,
+                "poisoning": self.params.poisoning,
             },
         }
 

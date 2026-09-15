@@ -38,6 +38,7 @@ class AttackParams:
     delay_rounds: int = 0 
     eclipse_targets: int = 0 
     partition_groups: int = 0
+    poisoning: bool = True
 
 
 def default_modules() -> tuple:
