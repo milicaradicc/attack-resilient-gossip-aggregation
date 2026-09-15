@@ -6,6 +6,17 @@ from typing import Optional
 from attacks.base import AttackContext, BaseAttack, module_rng
 
 
+BYZANTINE_PROFILES = ("coordinated", "extreme", "random", "low_biased")
+
+
+def validate_profile(profile: str) -> str:
+    if profile not in BYZANTINE_PROFILES:
+        raise ValueError(
+            f"unknown byzantine profile: {profile!r} "
+            f"(dozvoljeni: {', '.join(BYZANTINE_PROFILES)})")
+    return profile
+
+
 class ByzantineAttack(BaseAttack):
     name = "byzantine"
 
@@ -17,7 +28,7 @@ class ByzantineAttack(BaseAttack):
         if identity not in ctx.byzantine_ids:
             return None
         p = ctx.params
-        prof = p.byzantine_profile
+        prof = validate_profile(p.byzantine_profile)
         if prof == "extreme":
             return p.x_star + p.extreme_offset
         if prof == "random":

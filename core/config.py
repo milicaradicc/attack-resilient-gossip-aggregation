@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 from itertools import product
+
+from attacks.byzantine import validate_profile
 from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
@@ -132,6 +134,7 @@ def load_matrix(path: str) -> List[RunSpec]:
             for overlay in c["overlay"]:
                 for aggregation in c["aggregation"]:
                     for profile in c["byzantine_profile"]:
+                        validate_profile(profile)
                         for combo in product(*extra.values()):
                             for seed in c["seeds"]:
                                 fields = {**base, "n_honest": nh, "beta": beta,
