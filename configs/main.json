@@ -29,6 +29,6 @@
   ],
   "warmup": 10,
   "conv_window_start": 20,
-  "eclipse_targets": 1,
+  "eclipse_targets": 0.3,
   "per_node_metrics": true
 }

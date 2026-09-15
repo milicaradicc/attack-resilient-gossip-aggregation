@@ -37,7 +37,15 @@ class AttackContext:
 
     def targets(self) -> List[int]:
         k = self.params.eclipse_targets
-        return sorted(self.honest_ids)[:k] if k > 0 else []
+        if k <= 0:
+            return []
+        honest = sorted(self.honest_ids)
+        if 0 < k < 1:
+            count = max(1, int(round(k * len(honest))))
+        else:
+            count = min(int(k), len(honest))
+        rng = make_rng(self.params.experiment_seed, "eclipse_targets")
+        return sorted(rng.sample(honest, count))
 
 
 @runtime_checkable
