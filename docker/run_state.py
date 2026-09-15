@@ -94,6 +94,7 @@ class ControllerState:
                 "num_buckets": self.id_params.num_buckets,
                 "max_per_bucket": self.id_params.max_per_bucket,
                 "timeout_rounds": self.id_params.timeout_rounds,
+                "refresh_period": self.id_params.refresh_period,
             },
             "attack": {
                 "byzantine_profile": self.params.byzantine_profile,

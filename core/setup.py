@@ -26,7 +26,6 @@ class RunConfig:
 
 
 def build_nodes(cfg: RunConfig) -> Dict[int, Node]:
-    # iz jednog globalnog seeda izvode se dva generatora -> biranje komsija i biranje vrednosti nezavisno
     val_rng = make_rng(cfg.global_seed, "initial_metrics")
     top_rng = make_rng(cfg.global_seed, "overlay_topology")
     nodes = {
@@ -62,7 +61,6 @@ def malicious_counts(n_honest: int, beta: float, byzantine_fraction: float):
 
 @dataclass
 class World:
-    # sve sto cini jedan eksperiment pre nego sto krene izvrsavanje
     cfg: RunConfig
     nodes: Dict[int, Node]
     honest: Set[int]
@@ -104,6 +102,7 @@ def build_world(spec) -> World:
         num_buckets=spec.num_buckets,
         max_per_bucket=spec.max_per_bucket,
         timeout_rounds=spec.timeout_rounds,
+        refresh_period=spec.refresh_period,
     )
     nonces = solve_nonces(honest | byzantine | sybil, id_params)
     for i in honest:
@@ -111,7 +110,6 @@ def build_world(spec) -> World:
     seed_observations(nodes)
     x_star = mean(n.x_local for n in nodes.values())
 
-    # dodaj napadace
     att_rng = make_rng(spec.seed, "attacker_metrics")
     attackers = {}
     for i in sorted(byzantine | sybil):

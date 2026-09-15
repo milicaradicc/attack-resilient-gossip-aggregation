@@ -24,6 +24,8 @@ class Engine:
         offered = 0
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
+            self.sampling.refresh_peers(node, round_now, self.rng)
+        for node in self.nodes.values():
             round_ops.send_peer_request(node, round_now, transport=transport)
         for node in self.nodes.values():
             candidates = self.scenario.offer_candidates(node, round_now, self.rng)

@@ -16,9 +16,16 @@ class SybilResistantStrategy:
     def __init__(self, max_peers: int, params: IdentityParams, fanout: int = 0):
         self.max_peers = max_peers
         self.params = params
+        # B8: broj peer-ova po rundi; 0 = ceo peer set, 1 = doslovno po spec 3.2
         self.fanout = fanout
+        # B5: cvorovi cijem je peer set-u refresh otvorio mesto za jednu zamenu
+        # u tekucoj rundi: {node_id: runda}
+        self._open = {}
 
     def pow_valid(self, node: Node, candidate: int) -> bool:
+        # nema registra: nonce je ono sto je kandidat sam predstavio u svojoj
+        # peer_exchange ponudi i sto je observe() zabelezio uz njega (videti
+        # core/round_ops.py) — ovde se samo lokalno verifikuje javnom funkcijom
         obs = node.observations.get(candidate)
         nonce = obs.nonce if obs is not None else None
         if nonce is None:
@@ -47,6 +54,8 @@ class SybilResistantStrategy:
         if cand_score < self.params.score_threshold:
             return "low_score"
         if len(node.peers) >= self.max_peers:
+            if self._open.get(node.node_id) == round_now:
+                return None
             weakest = min(node.peers, key=lambda p: self.score(node, p, round_now))
             if self.score(node, weakest, round_now) >= cand_score:
                 return "low_score"
@@ -58,9 +67,21 @@ class SybilResistantStrategy:
     def evict_peer(self, node: Node, round_now: int, candidate: Optional[int] = None) -> Optional[int]:
         if len(node.peers) < self.max_peers:
             return None
+        if self._open.get(node.node_id) == round_now:
+            self._open.pop(node.node_id, None)
         return min(node.peers, key=lambda p: self.score(node, p, round_now))
 
     def refresh_peers(self, node: Node, round_now: int, rng: random.Random) -> None:
+        period = self.params.refresh_period
+        if period <= 0:
+            return None
+
+        for peer in list(node.peers):
+            if not self.pow_valid(node, peer):
+                node.peers.remove(peer)
+
+        if round_now % period == 0:
+            self._open[node.node_id] = round_now
         return None
 
     def choose_gossip_target(self, node: Node, rng: random.Random) -> Optional[int]:

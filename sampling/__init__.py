@@ -15,7 +15,8 @@ def get_strategy(
     fanout: int = 0,
 ) -> SamplingStrategy:
     if name == "random":
-        return RandomStrategy(max_peers, seed, fanout)
+        return RandomStrategy(max_peers, seed, fanout,
+                              params.refresh_period if params else 0)
     if name == "sybil_resistant":
         return SybilResistantStrategy(max_peers, params, fanout)
     if name == "eclipse_resistant":

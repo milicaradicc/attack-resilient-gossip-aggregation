@@ -26,7 +26,7 @@ def _get(url):
             return r.status, json.loads(r.read()) 
     except urllib.error.HTTPError as e: 
         return e.code, None
-    except (urllib.error.URLError, ConnectionError, OSError):
+    except (urllib.error.URLError, ConnectionError, OSError): 
         return 503, None
 
 
@@ -61,6 +61,8 @@ def _block_post(url, obj, poll=0.05):
 
 def _fetch_value(addresses, peer: int, job: int, round_now: int,
                  participants: int, requester: int, poll=0.05):
+    # requester: B9 — odluka o odgovoru je po paru, pa trazilac mora da se
+    # predstavi; peer strana odlucuje da li bas njemu odgovara
     if peer >= participants:
         return None
     url = addresses.get(str(peer))
@@ -139,6 +141,7 @@ def run_honest(base, node_id, cfg, job, store, addresses):
         if trace is not None:
             trace.estimate(r, node_id, node.estimate)
 
+        strategy.refresh_peers(node, r, None)
         round_ops.send_peer_request(node, r, transport=transport)
         _block_post(f"{base}/peers", _tag({"node_id": node_id, "round": r, "peers": node.peers}, job))
         opath = f"{base}/offers/{job}/{node_id}/{r}"

@@ -47,6 +47,7 @@
   "eclipse_targets": 0,
   "partition_groups": 0,
   "gossip_fanout": 0,
+  "refresh_period": 5,
   "epsilon": 0.05,
   "conv_window_start": 20,
   "per_node_metrics": true,

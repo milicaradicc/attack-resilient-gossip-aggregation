@@ -11,10 +11,12 @@ from sampling.base import choose_one, select_fanout
 class RandomStrategy:
     name = "random"
 
-    def __init__(self, max_peers: int, seed: int = 0, fanout: int = 0):
+    def __init__(self, max_peers: int, seed: int = 0, fanout: int = 0,
+                 refresh_period: int = 0):
         self.max_peers = max_peers
         self.seed = seed
         self.fanout = fanout
+        self.refresh_period = refresh_period
 
     def reason(self, node: Node, candidate: int, round_now: int) -> Optional[str]:
         if candidate == node.node_id or candidate in node.peers:
