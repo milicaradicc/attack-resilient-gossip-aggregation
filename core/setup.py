@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from statistics import mean
 from typing import Dict, Set
 
@@ -72,6 +72,7 @@ class World:
     id_params: IdentityParams
     scenario: Scenario
     x_star: float
+    attackers: Dict[int, Node] = field(default_factory=dict)
 
 
 def build_world(spec) -> World:
@@ -110,6 +111,14 @@ def build_world(spec) -> World:
     seed_observations(nodes)
     x_star = mean(n.x_local for n in nodes.values())
 
+    # dodaj napadace
+    att_rng = make_rng(spec.seed, "attacker_metrics")
+    attackers = {}
+    for i in sorted(byzantine | sybil):
+        att = Node.create(i, att_rng.uniform(spec.value_low, spec.value_high))
+        att.nonce = nonces[i]
+        attackers[i] = att
+
     if n_byzantine + n_sybil == 0:
         scenario = Scenario.benign(honest)
     else:
@@ -120,6 +129,8 @@ def build_world(spec) -> World:
             random_low=spec.random_low,
             random_high=spec.random_high,
             low_bias=spec.low_bias,
+            value_low=spec.value_low,
+            value_high=spec.value_high,
             discovery_offers=spec.discovery_offers,
             x_star=x_star,
             experiment_seed=spec.seed, 
@@ -131,6 +142,9 @@ def build_world(spec) -> World:
             unresponsive_p=spec.unresponsive_p,
             eclipse_targets=spec.eclipse_targets,
             delay_rounds=spec.delay_rounds,
+            partition_groups=spec.partition_groups,
         ))
 
-    return World(cfg, nodes, honest, byzantine, sybil, nonces, id_params, scenario, x_star)
+    scenario.attacker_nodes = attackers
+    return World(cfg, nodes, honest, byzantine, sybil, nonces, id_params, scenario, x_star,
+                 attackers)

@@ -15,14 +15,21 @@ def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Rando
 
 
 class AttackContext:
-    __slots__ = ("honest_ids", "byzantine_ids", "sybil_ids", "params")
+    __slots__ = ("honest_ids", "byzantine_ids", "sybil_ids", "params", "attacker_nodes")
 
     def __init__(self, honest_ids: Set[int], byzantine_ids: Set[int],
-                 sybil_ids: Set[int], params):
+                 sybil_ids: Set[int], params, attacker_nodes: Dict[int, object] = None):
         self.honest_ids = honest_ids
         self.byzantine_ids = byzantine_ids
         self.sybil_ids = sybil_ids
         self.params = params
+        self.attacker_nodes = attacker_nodes if attacker_nodes is not None else {}
+
+    def attacker_view(self, identity: int) -> Optional[float]:
+        # trenutna procena koju napadacki cvor drzi (ono sto je stvarno cuo od
+        # honest suseda) — koristi je delay napad za pravi stale information
+        node = self.attacker_nodes.get(identity)
+        return None if node is None else node.estimate
 
     @property
     def malicious_ids(self) -> Set[int]:
@@ -55,7 +62,8 @@ class BaseAttack:
                         round_now: int) -> Optional[float]:
         return None
 
-    def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
+    def responds(self, ctx: AttackContext, identity: int, round_now: int,
+                 target: Optional[int] = None) -> Optional[bool]:
         return None
 
     def before_round(self, ctx: AttackContext, nodes: Dict[int, object],

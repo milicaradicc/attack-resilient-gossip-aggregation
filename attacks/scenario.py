@@ -10,6 +10,7 @@ from attacks.churn import ChurnAttack
 from attacks.delay import DelayAttack
 from attacks.eclipse import EclipseAttack
 from attacks.flooding import PeerFloodingAttack
+from attacks.partitioning import PartitioningAttack
 from attacks.poisoning import PeerPoisoningAttack
 from attacks.selective import SelectiveForwardingAttack
 from core.node import Node
@@ -24,6 +25,8 @@ class AttackParams:
     random_high: float = 1000.0
     low_bias: float = 5.0
     x_star: float = 100.0
+    value_low: float = 50.0
+    value_high: float = 150.0
     experiment_seed: int = 0
     activate_round: int = 1
     discovery_offers: int = 2 
@@ -34,6 +37,7 @@ class AttackParams:
     unresponsive_p: float = 0.0
     delay_rounds: int = 0 
     eclipse_targets: int = 0 
+    partition_groups: int = 0
 
 
 def default_modules() -> tuple:
@@ -42,6 +46,7 @@ def default_modules() -> tuple:
         PeerPoisoningAttack(),
         EclipseAttack(),      
         PeerFloodingAttack(),
+        PartitioningAttack(),
         DelayAttack(),        
         SelectiveForwardingAttack(),
         ByzantineAttack(),
@@ -55,6 +60,7 @@ class Scenario:
     sybil_ids: Set[int]
     params: AttackParams = field(default_factory=AttackParams)
     modules: tuple = field(default_factory=default_modules)
+    attacker_nodes: Dict[int, Node] = field(default_factory=dict)
 
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
@@ -67,7 +73,8 @@ class Scenario:
 
     @property
     def ctx(self) -> AttackContext:
-        return AttackContext(self.honest_ids, self.byzantine_ids, self.sybil_ids, self.params)
+        return AttackContext(self.honest_ids, self.byzantine_ids, self.sybil_ids,
+                             self.params, self.attacker_nodes)
 
     def active_modules(self) -> List:
         ctx = self.ctx
@@ -97,14 +104,15 @@ class Scenario:
             return 0
         return len(module.returning_ids(self.ctx, round_now))
 
-    def responds(self, identity: int, round_now: int, rng: random.Random) -> bool:
+    def responds(self, identity: int, round_now: int, rng: random.Random,
+                 target: int = None) -> bool:
         if identity >= FLOOD_BASE:
             return False
         if not self.active(round_now) or identity not in self.malicious_ids:
             return True
         ctx = self.ctx
         for module in self.active_modules():
-            decision = module.responds(ctx, identity, round_now)
+            decision = module.responds(ctx, identity, round_now, target)
             if decision is not None:
                 return decision
         return True

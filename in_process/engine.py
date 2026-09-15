@@ -55,8 +55,21 @@ class Engine:
 
     def _heartbeat(self, node, peers, round_now, transport=None):
         return round_ops.heartbeat(node, peers, round_now, self.timeout_rounds,
-                                   lambda p: self.scenario.responds(p, round_now, self.rng),
+                                   lambda p: self.scenario.responds(p, round_now, self.rng,
+                                                                    target=node.node_id),
                                    trace=self.trace, transport=transport)
+
+    def _update_attackers(self, round_now):
+        attackers = self.scenario.attacker_nodes
+        if not attackers:
+            return
+        for aid, att in attackers.items():
+            att.peers = sorted(hid for hid, n in self.nodes.items() if aid in n.peers)
+            for h in att.peers:
+                round_ops.observe(att, h, round_now, exchanged=True)
+            heard = [n.estimate for n in self.nodes.values()]
+            if heard:
+                att.estimate = sum(heard) / len(heard)
 
     def run(self):
         self.metrics.record(0, self.nodes, self.scenario, RoundCounters())
@@ -71,6 +84,7 @@ class Engine:
                 self.trace.attack_activated(r, len(self.scenario.malicious_ids))
             transport = Transport()
 
+            self._update_attackers(r)
             emitted = self._emit(r) 
             own = {hid: n.estimate for hid, n in self.nodes.items()}
 

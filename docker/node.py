@@ -62,14 +62,14 @@ def _block_post(url, obj, poll=0.05):
 
 
 def _fetch_value(addresses, peer: int, job: int, round_now: int,
-                 participants: int, poll=0.05):
+                 participants: int, requester: int, poll=0.05):
     if peer >= participants:
         return None
     url = addresses.get(str(peer))
     if url is None:
         return None
     while True:
-        status, body = _get(f"{url}/value/{job}/{round_now}")
+        status, body = _get(f"{url}/value/{job}/{round_now}/{requester}")
         if status == 200:
             return body
         if status != 425:
@@ -119,16 +119,16 @@ def run_honest(base, node_id, cfg, job, store, addresses):
 
         own = node.estimate
         store.publish(job, r, _sendable(scenario.broadcast_value(node_id, own, r)),
-                      responds=scenario.responds(node_id, r, None))
+                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who))
 
         responders, timeouts = round_ops.heartbeat(
             node, list(node.peers), r, timeout_rounds,
-            lambda p: scenario.responds(p, r, None),
+            lambda p: scenario.responds(p, r, None, target=node_id),
             trace=trace, transport=transport)
 
         values = {}
         for p in list(responders):
-            reply = _fetch_value(addresses, p, job, r, participants)
+            reply = _fetch_value(addresses, p, job, r, participants, node_id)
             if reply is not None and reply["value"] is not None:
                 values[p] = reply["value"]
 
@@ -159,11 +159,26 @@ def run_honest(base, node_id, cfg, job, store, addresses):
 
 
 def run_malicious(base, node_id, cfg, job, store, addresses):
-    _, _, scenario = _build(cfg)
+    params, nonces, scenario = _build(cfg)
+    att = Node.create(node_id, cfg.get("x_star", 100.0))
+    att.nonce = nonces.get(node_id, 0)
+    scenario.attacker_nodes = {node_id: att}
+    participants = cfg["participants"]
+
     for r in range(1, cfg["num_rounds"] + 1):
+        heard = []
+        for h in range(cfg["n_honest"]):
+            reply = _fetch_value(addresses, h, job, r, participants, node_id)
+            if reply is not None and reply["value"] is not None:
+                heard.append(reply["value"])
+                round_ops.observe(att, h, r, exchanged=True)
+        if heard:
+            att.estimate = sum(heard) / len(heard)
+            att.peers = sorted(att.observations)
+
         store.publish(job, r,
-                      _sendable(scenario.broadcast_value(node_id, 0.0, r)),
-                      responds=scenario.responds(node_id, r, None))
+                      _sendable(scenario.broadcast_value(node_id, att.estimate, r)),
+                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who))
 
 
 def run_matrix_node(base, node_id, advertise_host="127.0.0.1", port=0):
