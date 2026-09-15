@@ -26,6 +26,7 @@
   "age_min": 3,
   "age_max": 20,
   "exchange_max": 20,
+  "reliability_max": 20,
   "score_threshold": 0.5,
   "num_buckets": 8,
   "max_per_bucket": 2,

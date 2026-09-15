@@ -9,6 +9,7 @@ class IdentityParams:
     age_min: int = 3
     age_max: int = 20
     exchange_max: int = 20
+    reliability_max: int = 20  
     score_threshold: float = 0.5
     num_buckets: int = 8
     max_per_bucket: int = 2

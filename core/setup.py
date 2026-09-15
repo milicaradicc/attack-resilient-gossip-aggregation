@@ -98,6 +98,7 @@ def build_world(spec) -> World:
         age_min=spec.age_min,
         age_max=spec.age_max,
         exchange_max=spec.exchange_max,
+        reliability_max=spec.reliability_max,
         score_threshold=spec.score_threshold,
         num_buckets=spec.num_buckets,
         max_per_bucket=spec.max_per_bucket,

@@ -87,6 +87,7 @@ class ControllerState:
                 "age_min": self.id_params.age_min, 
                 "age_max": self.id_params.age_max,
                 "exchange_max": self.id_params.exchange_max,
+                "reliability_max": self.id_params.reliability_max,
                 "score_threshold": self.id_params.score_threshold,
                 "num_buckets": self.id_params.num_buckets,
                 "max_per_bucket": self.id_params.max_per_bucket,

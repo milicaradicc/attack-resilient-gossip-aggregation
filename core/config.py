@@ -40,6 +40,7 @@ class RunSpec:
     age_min: int = 3
     age_max: int = 20
     exchange_max: int = 20
+    reliability_max: int = 20
     score_threshold: float = 0.5
     max_per_bucket: int = 2
     value_low: float = 50.0
@@ -100,7 +101,8 @@ def _spec_fields(c, override=None):
         churn_period=c["churn_period"], selective_p=c["selective_p"],
         timeout_rounds=c["timeout_rounds"], unresponsive_p=c["unresponsive_p"],
         trim_alpha=c["trim_alpha"], age_min=c["age_min"], age_max=c["age_max"],
-        exchange_max=c["exchange_max"], score_threshold=c["score_threshold"],
+        exchange_max=c["exchange_max"], reliability_max=c["reliability_max"],
+        score_threshold=c["score_threshold"],
         max_per_bucket=c["max_per_bucket"], value_low=c["value_low"],
         value_high=c["value_high"], discovery_offers=c["discovery_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],

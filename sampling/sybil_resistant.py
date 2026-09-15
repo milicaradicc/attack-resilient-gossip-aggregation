@@ -33,7 +33,7 @@ class SybilResistantStrategy:
         missed = 0 if obs is None else obs.missed_total
         return identity_score(round_now, first_seen, exchanges, self.pow_valid(node, candidate),
                               self.params.age_max, self.params.exchange_max,
-                              missed_total=missed)
+                              self.params.reliability_max, missed_total=missed)
 
     def reason(self, node: Node, candidate: int, round_now: int) -> Optional[str]:
         if candidate == node.node_id or candidate in node.peers:
