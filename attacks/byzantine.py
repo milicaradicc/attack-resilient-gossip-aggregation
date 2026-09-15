@@ -11,7 +11,10 @@ class ByzantineAttack(BaseAttack):
 
     def broadcast_value(self, ctx: AttackContext, identity: int, value: float,
                         round_now: int) -> Optional[float]:
-        if identity not in ctx.malicious_ids:
+        if identity in ctx.sybil_ids:
+            r = module_rng(ctx, identity, round_now, "sybil_value")
+            return r.uniform(ctx.params.value_low, ctx.params.value_high)
+        if identity not in ctx.byzantine_ids:
             return None
         p = ctx.params
         prof = p.byzantine_profile

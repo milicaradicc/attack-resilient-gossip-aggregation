@@ -122,7 +122,7 @@ def test_convergence_time_measured_from_given_round():
     aktivacija = next(r for r in metrics.rows if r.round == spec.activate_round)
     posle = next(r for r in metrics.rows if r.round == spec.activate_round + 1)
     assert aktivacija.err_rel < spec.epsilon, "runda aktivacije vec pokazuje napad"
-    assert posle.err_rel > aktivacija.err_rel * 10, "napad se ne vidi ni posle aktivacije"
+    assert posle.err_rel > aktivacija.err_rel * 5, "napad se ne vidi ni posle aktivacije"
 
 
 def test_convergence_time_returns_sentinel_when_never_reached():
@@ -153,6 +153,7 @@ def test_recovery_matches_when_system_stays_good():
 
 
 def test_csv_and_json_export_agree():
+    # 5.2.9: isti brojevi moraju stici i u CSV i u JSON izvoz
     config = os.path.join(ROOT, "configs", "tiny.json")
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "e.csv")
@@ -190,6 +191,8 @@ def test_exported_headers_match_definitions():
 
 
 def test_trace_integrity():
+    # 5.2.9: integritet trace podataka — svaki dogadjaj pripada postojecoj rundi
+    # i poznatom tipu, a broj kolona odgovara definiciji
     from metrics.event_trace import TRACE_FIELDS, EventTrace
     spec = spec_from(n_honest=12, beta=0.3, overlay="eclipse_resistant",
                      aggregation="trimmed_mean", seed=1, num_rounds=20,

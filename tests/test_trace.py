@@ -66,6 +66,7 @@ def test_rejection_reasons_are_named():
 
 
 def test_trace_records_attacker_activity():
+    # 5.1.8: napadacke aktivnosti — emitovane vrednosti, churn i flooding
     trace = EventTrace()
     spec = _spec()
     spec.flooding = 5
@@ -74,7 +75,13 @@ def test_trace_records_attacker_activity():
     events = {e.event for e in trace.events}
     assert BROADCAST in events and CHURN in events and FLOOD in events
     emitted = [e for e in trace.events if e.event == BROADCAST]
-    assert all(e.value == spec.coordinated_value for e in emitted)
+    # B6: coordinated_value salju samo Byzantine cvorovi; Sybil identiteti
+    # emituju vrednost iz legitimnog opsega, pa se u zapisu javljaju obe vrste
+    byz = [e for e in emitted if e.value == spec.coordinated_value]
+    syb = [e for e in emitted if e.value != spec.coordinated_value]
+    assert byz, "Byzantine cvorovi moraju emitovati koordinisanu vrednost"
+    assert all(spec.value_low <= e.value <= spec.value_high for e in syb), (
+        "Sybil vrednosti moraju ostati u legitimnom opsegu")
 
 
 def test_csv_rows_match_fields():

@@ -20,7 +20,13 @@ def _scenario():
 def test_byzantine_broadcasts_coordinated_value():
     s = _scenario()
     assert s.broadcast_value(2, 5.0, round_now=5) == 1000.0
-    assert s.broadcast_value(3, 5.0, round_now=5) == 1000.0
+
+
+def test_sybil_broadcasts_legitimate_looking_value():
+    s = _scenario()
+    value = s.broadcast_value(3, 5.0, round_now=5)
+    assert value != 1000.0
+    assert s.params.value_low <= value <= s.params.value_high
 
 
 def test_honest_broadcasts_true_value():
@@ -54,8 +60,12 @@ def test_defense_beats_robust_aggregation_alone():
 
 
 def test_robust_aggregation_insufficient_without_structure():
-    median_err = run("random", "median", **SMALL)[-1].err_rel
-    assert median_err > 1.0
+    unprotected = run("random", "median", **SMALL)[-1]
+    protected = run("sybil_resistant", "median", **SMALL)[-1]
+    assert unprotected.sybil_penetration > 0.2, "napadaci moraju uci u peer set"
+    assert unprotected.err_rel > protected.err_rel, (
+        "bez admission kontrole median mora biti losiji nego sa njom")
+    assert unprotected.err_rel > 0.05, "greska mora premasiti prag iz 3.10"
 
 
 if __name__ == "__main__":

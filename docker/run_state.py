@@ -101,6 +101,8 @@ class ControllerState:
                 "random_low": self.params.random_low, 
                 "random_high": self.params.random_high,
                 "low_bias": self.params.low_bias, 
+                "value_low": self.params.value_low,
+                "value_high": self.params.value_high,
                 "x_star": self.params.x_star,
                 "experiment_seed": self.params.experiment_seed, 
                 "activate_round": self.params.activate_round,
@@ -112,6 +114,7 @@ class ControllerState:
                 "unresponsive_p": self.params.unresponsive_p,
                 "eclipse_targets": self.params.eclipse_targets,
                 "delay_rounds": self.params.delay_rounds,
+                "partition_groups": self.params.partition_groups,
             },
         }
 

@@ -12,17 +12,17 @@ class SelectiveForwardingAttack(BaseAttack):
     def enabled(self, ctx: AttackContext) -> bool:
         return ctx.params.selective_p < 1.0 or ctx.params.unresponsive_p > 0.0
 
-    def broadcast_value(self, ctx: AttackContext, identity: int, value: float,
-                        round_now: int) -> Optional[float]:
+    def responds(self, ctx: AttackContext, identity: int, round_now: int,
+                 target: Optional[int] = None) -> Optional[bool]:
         p = ctx.params
-        if p.selective_p >= 1.0 or identity not in ctx.malicious_ids:
+        if identity not in ctx.malicious_ids:
             return None
-        r = module_rng(ctx, identity, round_now, "selective")
-        return None if r.random() > p.selective_p else NO_MESSAGE
-
-    def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
-        p = ctx.params
-        if p.unresponsive_p <= 0.0 or identity not in ctx.malicious_ids:
-            return None
-        r = module_rng(ctx, identity, round_now, "unresponsive")
-        return r.random() >= p.unresponsive_p
+        if p.selective_p < 1.0 and target is not None:
+            r = module_rng(ctx, identity, round_now, f"selective_{target}")
+            if r.random() > p.selective_p:
+                return False
+        if p.unresponsive_p > 0.0:
+            r = module_rng(ctx, identity, round_now, "unresponsive")
+            if r.random() < p.unresponsive_p:
+                return False
+        return None

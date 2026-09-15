@@ -8,9 +8,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class ValueStore:
     def __init__(self):
         self._lock = threading.Lock()
-        self._published = {} # (job, round) -> {"value": float|None, "responds": bool}
+        self._published = {} # (job, round) -> {"value": float|None, "responds": callable}
 
-    def publish(self, job: int, round_now: int, value, responds: bool) -> None:
+    def publish(self, job: int, round_now: int, value, responds) -> None:
         with self._lock:
             self._published[(job, round_now)] = {"value": value, "responds": responds}
 
@@ -38,15 +38,19 @@ def make_handler(store: ValueStore, node_id: int):
             self.wfile.write(body)
 
         def do_GET(self):
+            # /value/{job}/{round}/{requester}
             parts = self.path.strip("/").split("/")
-            if parts[0] != "value" or len(parts) != 3:
+            if parts[0] != "value" or len(parts) != 4:
                 self._send(404, {})
                 return
-            job, round_now = int(parts[1]), int(parts[2])
+            job, round_now, requester = int(parts[1]), int(parts[2]), int(parts[3])
             entry = store.get(job, round_now)
             if entry is None:
                 self._send(425, {"ready": False})
-            elif not entry["responds"]:
+                return
+            answers = entry["responds"]
+            ok = answers(requester) if callable(answers) else bool(answers)
+            if not ok:
                 self._send(503, {})
             else:
                 self._send(200, {"node_id": node_id, "value": entry["value"]})

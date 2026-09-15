@@ -44,7 +44,8 @@ class ChurnAttack(BaseAttack):
         return [i for i in sorted(ctx.malicious_ids)
                 if self.offline(ctx, i, round_now)]
 
-    def responds(self, ctx: AttackContext, identity: int, round_now: int) -> Optional[bool]:
+    def responds(self, ctx: AttackContext, identity: int, round_now: int,
+                 target: Optional[int] = None) -> Optional[bool]:
         if identity not in ctx.malicious_ids:
             return None
         return False if self.offline(ctx, identity, round_now) else None
