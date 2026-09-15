@@ -25,7 +25,7 @@ def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
 
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets,
                                 per_node=spec.per_node_metrics)
-    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params)
+    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params, spec.seed)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)

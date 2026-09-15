@@ -11,9 +11,10 @@ def get_strategy(
     name: str,
     max_peers: int,
     params: Optional[IdentityParams] = None,
+    seed: int = 0,
 ) -> SamplingStrategy:
     if name == "random":
-        return RandomStrategy(max_peers)
+        return RandomStrategy(max_peers, seed)
     if name == "sybil_resistant":
         return SybilResistantStrategy(max_peers, params)
     if name == "eclipse_resistant":

@@ -108,7 +108,7 @@ def run_honest(base, node_id, cfg, job, store, addresses):
 
     agg_kwargs = {"alpha": cfg["trim_alpha"]} if cfg["aggregation"] == "trimmed_mean" else {}
     aggregation = get_aggregation(cfg["aggregation"], **agg_kwargs)
-    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], params)
+    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], params, cfg.get("seed", 0))
     timeout_rounds = cfg["timeout_rounds"]
     participants = cfg["participants"]
 
