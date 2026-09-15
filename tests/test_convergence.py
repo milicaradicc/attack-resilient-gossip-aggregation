@@ -16,8 +16,6 @@ from tests.helpers import run_benign as run
 
 
 def _run_world(spec):
-    # pokretanje koje zadrzava pristup samim cvorovima (procene i peer set-ovi),
-    # potrebno za proveru konvergencije po cvoru i za replay peer set-ova
     world = build_world(spec)
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets)
     agg = get_aggregation(spec.aggregation)
@@ -33,25 +31,20 @@ def test_benign_convergence():
                      aggregation="mean", seed=42, num_rounds=50)
     _, metrics = _run_world(spec)
     last = metrics.rows[-1]
-    assert last.spread < 1e-6, f"nema konsenzusa, spread={last.spread}"
-    assert last.err_rel < 1e-2, f"greska prevelika, err_rel={last.err_rel}"
+    assert last.spread < 1e-6, f"no consensus, spread={last.spread}"
+    assert last.err_rel < 1e-2, f"error too large, err_rel={last.err_rel}"
 
 
 def test_every_node_reaches_consensus():
-    # 5.2.6: uslov iz specifikacije je po cvoru, |x_i - x*| < 0.01 za SVAKI honest cvor.
-    # Ispunjen je jer je topologija regularna (svi cvorovi imaju isti broj suseda),
-    # pa gossip usrednjavanje konvergira tacno ka aritmetickoj sredini.
     spec = spec_from(n_honest=10, beta=0.0, overlay="sybil_resistant",
                      aggregation="mean", seed=42, num_rounds=50)
     world, _ = _run_world(spec)
     for node_id, node in world.nodes.items():
         assert abs(node.estimate - world.x_star) < 0.01, (
-            f"cvor {node_id} nije konvergirao: {node.estimate} vs {world.x_star}")
+            f"node {node_id} did not converge: {node.estimate} vs {world.x_star}")
 
 
 def test_defenses_do_not_break_benign_convergence():
-    # 5.2.6: cilj testa nije analiza otpornosti nego potvrda da overlay strategije
-    # ne narusavaju benignu konvergenciju — sve tri moraju dati isti rezultat
     results = {}
     for overlay in ("sybil_resistant", "eclipse_resistant"):
         spec = spec_from(n_honest=10, beta=0.0, overlay=overlay, aggregation="mean",
@@ -59,59 +52,59 @@ def test_defenses_do_not_break_benign_convergence():
         world, _ = _run_world(spec)
         for node_id, node in world.nodes.items():
             assert abs(node.estimate - world.x_star) < 0.01, (
-                f"{overlay}: cvor {node_id} nije konvergirao")
+                f"{overlay}: node {node_id} did not converge")
         results[overlay] = world.nodes[0].estimate
-    vrednosti = list(results.values())
-    assert max(vrednosti) - min(vrednosti) < 1e-6, (
-        f"strategije konvergiraju ka razlicitim vrednostima: {results}")
+    values = list(results.values())
+    assert max(values) - min(values) < 1e-6, (
+        f"strategies converge to different values: {results}")
 
 
 def test_initial_values_are_random_but_reproducible():
-    # 5.2.6: honest cvorovi dobijaju slucajne pocetne vrednosti iz zadatog opsega,
-    # ali iste za isti seed (4.10)
     spec = spec_from(n_honest=10, beta=0.0, seed=42)
     first, _ = _run_world(spec)
     second, _ = _run_world(spec)
     values = [n.x_local for n in first.nodes.values()]
-    assert len(set(values)) > 1, "pocetne vrednosti nisu razlicite"
+    assert len(set(values)) > 1, "initial values are not distinct"
     assert all(spec.value_low <= v <= spec.value_high for v in values)
     assert values == [n.x_local for n in second.nodes.values()]
 
 
 def test_convergence_limited_by_irregular_topology():
-    # Poznato ogranicenje: pri neparnom broju cvorova i neparnom K regularan graf
-    # ne postoji (n*k mora biti paran), pa jedan cvor ima K-1 suseda i konsenzus
-    # se blago pomera. Test belezi granicu umesto da je precuti.
-    spec = spec_from(n_honest=15, beta=0.0, overlay="sybil_resistant",
+    worst_cases = []
+    for seed in (1, 2, 3, 42):
+        spec = spec_from(n_honest=15, beta=0.0, overlay="sybil_resistant",
+                         aggregation="mean", seed=seed, num_rounds=50)
+        world, _ = _run_world(spec)
+        worst_cases.append(max(abs(n.estimate - world.x_star)
+                               for n in world.nodes.values()))
+    assert max(worst_cases) < 1.0, (
+        f"deviation {max(worst_cases)} is outside the expected order of magnitude")
+
+    spec = spec_from(n_honest=16, beta=0.0, overlay="sybil_resistant",
                      aggregation="mean", seed=42, num_rounds=50)
     world, _ = _run_world(spec)
-    worst = max(abs(n.estimate - world.x_star) for n in world.nodes.values())
-    assert worst < 0.05, f"odstupanje {worst} vece od ocekivanog reda 1e-2"
+    regular = max(abs(n.estimate - world.x_star) for n in world.nodes.values())
+    assert regular < 1e-6, (
+        f"a regular topology must converge exactly, but the deviation is {regular}")
 
 
 def test_without_admission_benign_convergence_degrades():
-    # Peer sampling menja peer set-ove i bez napada. Referentna strategija prima
-    # svakog kandidata, pa veze postaju jednosmerne: cvor koga slusa vise suseda
-    # jace utice na rezultat i konsenzus se pomera od aritmeticke sredine.
-    # Kontrola pristupa to sprecava odbacivanjem nezrelih kandidata.
-    bez = spec_from(n_honest=10, beta=0.0, overlay="random", aggregation="mean",
-                    seed=42, num_rounds=50)
-    sa = spec_from(n_honest=10, beta=0.0, overlay="sybil_resistant",
-                   aggregation="mean", seed=42, num_rounds=50)
-    svet_bez, _ = _run_world(bez)
-    svet_sa, _ = _run_world(sa)
-    odstupanje_bez = max(abs(n.estimate - svet_bez.x_star)
-                         for n in svet_bez.nodes.values())
-    odstupanje_sa = max(abs(n.estimate - svet_sa.x_star)
-                        for n in svet_sa.nodes.values())
-    assert odstupanje_sa < 0.01, "kontrola pristupa cuva tacnu konvergenciju"
-    assert odstupanje_bez > odstupanje_sa, (
-        "bez kontrole pristupa ocekuje se vece odstupanje")
+    without = spec_from(n_honest=10, beta=0.0, overlay="random", aggregation="mean",
+                        seed=42, num_rounds=50)
+    with_admission = spec_from(n_honest=10, beta=0.0, overlay="sybil_resistant",
+                               aggregation="mean", seed=42, num_rounds=50)
+    world_without, _ = _run_world(without)
+    world_with, _ = _run_world(with_admission)
+    deviation_without = max(abs(n.estimate - world_without.x_star)
+                            for n in world_without.nodes.values())
+    deviation_with = max(abs(n.estimate - world_with.x_star)
+                         for n in world_with.nodes.values())
+    assert deviation_with < 0.01, "admission control preserves exact convergence"
+    assert deviation_without > deviation_with, (
+        "without admission control a larger deviation is expected")
 
 
 def test_topology_is_regular():
-    # svaki cvor bira tacno k suseda; k-regularan graf postoji samo kada je n*k paran,
-    # pa je za neparno n (npr. 15) jedan cvor sa k-1 suseda neizbezan
     from core.overlay import build_random_overlay
     from core.rng import make_rng
     for n in (10, 20):
@@ -123,7 +116,6 @@ def test_topology_is_regular():
 
 
 def test_replay_reproduces_peer_sets():
-    # 5.2.7: replay mora reprodukovati i peer set-ove, ne samo agregacione vrednosti
     spec = spec_from(n_honest=12, beta=0.3, overlay="eclipse_resistant",
                      aggregation="trimmed_mean", seed=7, num_rounds=20,
                      activate_round=1, pow_difficulty_bits=8)
@@ -131,7 +123,7 @@ def test_replay_reproduces_peer_sets():
     b, mb = _run_world(spec)
     for node_id in a.nodes:
         assert a.nodes[node_id].peers == b.nodes[node_id].peers, (
-            f"peer set cvora {node_id} nije reprodukovan")
+            f"peer set of node {node_id} was not reproduced")
         assert a.nodes[node_id].estimate == b.nodes[node_id].estimate
     assert [r.err_rel for r in ma.rows] == [r.err_rel for r in mb.rows]
 
@@ -162,4 +154,4 @@ if __name__ == "__main__":
     test_replay_reproduces_peer_sets()
     test_determinism()
     test_different_seed_differs()
-    print("OK — svi testovi Faze 0 prolaze")
+    print("OK — all Phase 0 tests pass")

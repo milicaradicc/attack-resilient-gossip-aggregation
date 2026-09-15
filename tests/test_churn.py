@@ -113,7 +113,7 @@ def test_return_puts_the_identity_back_into_the_network():
     churn = world.scenario._churn()
     attacker = sorted(world.byzantine | world.sybil)[0]
     rng = random.Random(3)
-    comeback = next(r for r in range(1, 15) if churn.returning(ctx, attacker, r))
+    comeback = next(r for r in range(2, 15) if churn.returning(ctx, attacker, r))
     assert churn.offline(ctx, attacker, comeback - 1), "the round before the return is not an absence"
     assert not churn.offline(ctx, attacker, comeback)
     offers = set()

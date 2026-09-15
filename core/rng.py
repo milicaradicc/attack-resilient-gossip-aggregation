@@ -6,10 +6,10 @@ import random
 
 def derive_seed(global_seed: int, *parts: object) -> int:
     h = hashlib.sha256()
-    h.update(str(global_seed).encode())
     for p in parts:
-        h.update(b"|")
         h.update(str(p).encode())
+        h.update(b"|")
+    h.update(str(global_seed).encode())
     return int.from_bytes(h.digest()[:8], "big")
 
 
