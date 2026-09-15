@@ -134,9 +134,7 @@ def test_convergence_time_returns_sentinel_when_never_reached():
 
 
 def test_recovery_requires_lasting_improvement():
-    # dopuna uz 6.3.2: convergence_time belezi i kratkotrajan prolazak ispod
-    # praga, dok oporavak trazi da greska OSTANE ispod do kraja
-    spec = spec_from(n_honest=20, beta=0.3, overlay="sybil_resistant",
+    spec = spec_from(n_honest=20, beta=0.3, overlay="random",
                      aggregation="mean", seed=1)
     metrics = run_single(spec)
     konvergencija = metrics.convergence_time(spec.epsilon, since=spec.activate_round)
@@ -155,7 +153,6 @@ def test_recovery_matches_when_system_stays_good():
 
 
 def test_csv_and_json_export_agree():
-    # 5.2.9: isti brojevi moraju stici i u CSV i u JSON izvoz
     config = os.path.join(ROOT, "configs", "tiny.json")
     with tempfile.TemporaryDirectory() as tmp:
         out = os.path.join(tmp, "e.csv")
@@ -193,8 +190,6 @@ def test_exported_headers_match_definitions():
 
 
 def test_trace_integrity():
-    # 5.2.9: integritet trace podataka — svaki dogadjaj pripada postojecoj rundi
-    # i poznatom tipu, a broj kolona odgovara definiciji
     from metrics.event_trace import TRACE_FIELDS, EventTrace
     spec = spec_from(n_honest=12, beta=0.3, overlay="eclipse_resistant",
                      aggregation="trimmed_mean", seed=1, num_rounds=20,

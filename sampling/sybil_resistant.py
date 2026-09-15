@@ -17,9 +17,6 @@ class SybilResistantStrategy:
         self.params = params
 
     def pow_valid(self, node: Node, candidate: int) -> bool:
-        # nema registra: nonce je ono sto je kandidat sam predstavio u svojoj
-        # peer_exchange ponudi i sto je observe() zabelezio uz njega (videti
-        # core/round_ops.py) — ovde se samo lokalno verifikuje javnom funkcijom
         obs = node.observations.get(candidate)
         nonce = obs.nonce if obs is not None else None
         if nonce is None:
@@ -44,8 +41,13 @@ class SybilResistantStrategy:
         age = 0 if obs is None else round_now - obs.first_seen_round
         if age < self.params.age_min:
             return "too_young"
-        if self.score(node, candidate, round_now) < self.params.score_threshold:
+        cand_score = self.score(node, candidate, round_now)
+        if cand_score < self.params.score_threshold:
             return "low_score"
+        if len(node.peers) >= self.max_peers:
+            weakest = min(node.peers, key=lambda p: self.score(node, p, round_now))
+            if self.score(node, weakest, round_now) >= cand_score:
+                return "low_score"
         return None
 
     def accept_peer(self, node: Node, candidate: int, round_now: int) -> bool:

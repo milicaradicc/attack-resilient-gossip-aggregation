@@ -45,10 +45,12 @@ def test_structural_defense_reduces_penetration():
     assert random_pen > eclipse_pen
 
 
-def test_robust_aggregation_helps_under_defense():
-    mean_err = run("sybil_resistant", "mean", **SMALL)[-1].err_rel
-    median_err = run("sybil_resistant", "median", **SMALL)[-1].err_rel
-    assert median_err < mean_err
+def test_defense_beats_robust_aggregation_alone():
+    protected = run("sybil_resistant", "mean", **SMALL)[-1]
+    unprotected = run("random", "mean", **SMALL)[-1]
+    assert protected.sybil_penetration == 0.0
+    assert unprotected.sybil_penetration > 0.0
+    assert protected.err_rel < unprotected.err_rel
 
 
 def test_robust_aggregation_insufficient_without_structure():

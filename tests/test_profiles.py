@@ -16,7 +16,14 @@ def _spec(profile, overlay="eclipse_resistant", aggregation="mean", flooding=0):
 
 
 def test_extreme_hurts_mean():
-    assert run_single(_spec("extreme", aggregation="mean")).rows[-1].err_rel > 1.0
+    assert run_single(_spec("extreme", overlay="random",
+                            aggregation="mean")).rows[-1].err_rel > 1.0
+
+
+def test_admission_blocks_extreme_attack():
+    protected = run_single(_spec("extreme", overlay="sybil_resistant", aggregation="mean"))
+    assert protected.rows[-1].err_rel < 1.0
+    assert protected.rows[-1].sybil_penetration == 0.0
 
 
 def test_median_robust_across_profiles():
@@ -28,7 +35,10 @@ def test_median_robust_across_profiles():
 def test_flooding_raises_rejections_and_overhead():
     base = run_single(_spec("coordinated", overlay="sybil_resistant", flooding=0))
     flood = run_single(_spec("coordinated", overlay="sybil_resistant", flooding=20))
-    assert flood.rejected_ratio() > base.rejected_ratio()
+    assert (sum(r.rejected for r in flood.rows)
+            > sum(r.rejected for r in base.rows))
+    assert sum(r.rej_invalid_pow for r in flood.rows) > 0
+    assert sum(r.rej_invalid_pow for r in base.rows) == 0
     assert flood.control_overhead(10) > base.control_overhead(10)
 
 

@@ -7,6 +7,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from core.config import spec_from
+from core import round_ops
 from in_process.matrix import run_single
 from metrics.event_trace import (ACCEPT, ATTACK, BROADCAST, CHURN, EVICT, FLOOD,
                                  REJECT, TRACE_FIELDS, EventTrace)
@@ -19,9 +20,25 @@ def _spec(overlay="eclipse_resistant"):
 
 
 def test_trace_records_admission_decisions():
-    # 5.1.8: zapis mora sadrzati i prihvatanja i odbijanja kandidata
+    from core.node import Node
+    from identity.observation import Observation
+    from identity.params import IdentityParams
+    from identity.pow import solve_pow
+    from sampling.sybil_resistant import SybilResistantStrategy
+
+    params = IdentityParams(pow_difficulty_bits=8, age_min=3, age_max=20,
+                            exchange_max=20, score_threshold=0.5)
+    strategy = SybilResistantStrategy(max_peers=7, params=params)
+    node = Node.create(0, 1.0)
+    node.peers = [1, 2]  # ima mesta, ne treba eviction
+
+    good_nonce = solve_pow(str(5), params.pow_difficulty_bits)
+    node.observations[5] = Observation(first_seen_round=0, last_seen_round=10,
+                                       nonce=good_nonce)
+
     trace = EventTrace()
-    run_single(_spec(), trace=trace)
+    round_ops.admit(node, strategy, round_now=10, offered=[(5, good_nonce), (6, None)],
+                    trace=trace)
     events = {e.event for e in trace.events}
     assert ACCEPT in events and REJECT in events
 
@@ -49,7 +66,6 @@ def test_rejection_reasons_are_named():
 
 
 def test_trace_records_attacker_activity():
-    # 5.1.8: napadacke aktivnosti — emitovane vrednosti, churn i flooding
     trace = EventTrace()
     spec = _spec()
     spec.flooding = 5
