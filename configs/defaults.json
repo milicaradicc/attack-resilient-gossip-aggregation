@@ -46,6 +46,7 @@
   "delay_rounds": 0,
   "eclipse_targets": 0,
   "partition_groups": 0,
+  "poisoning": true,
   "gossip_fanout": 0,
   "refresh_period": 5,
   "epsilon": 0.05,

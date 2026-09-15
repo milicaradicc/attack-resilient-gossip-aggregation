@@ -89,12 +89,15 @@ def fig_final_error_bars(summary, beta, out_dir):
 
 
 def _realized(summary, nominal):
+    # prosek realizovane bete preko svih pokretanja sa datom nominalnom betom;
+    # ako kolone nema (stariji rezultati), vraca nominalnu
     vals = [r["realized_beta"] for r in summary
             if r.get("beta") == nominal and isinstance(r.get("realized_beta"), (int, float))]
     return mean(vals) if vals else nominal
 
 
 def table_realized_beta(summary, out):
+    # D1: preslikavanje nominalne u realizovanu betu po velicini mreze
     betas = sorted({r["beta"] for r in summary})
     sizes = sorted({r["n_honest"] for r in summary})
     lines = ["## Nominalna naspram realizovane bete", "",
@@ -123,6 +126,10 @@ def table_realized_beta(summary, out):
 def fig_penetration_vs_beta(summary, out_dir):
     betas = sorted({r["beta"] for r in summary})
     stats = group_stats(summary, ("overlay", "beta"), "final_sybil_penetration")
+    # D1: na x-osi stoji REALIZOVANA beta. Nominalna beta je samo oznaka
+    # konfiguracije; sa celobrojnim brojem cvorova stvarni udeo zlonamernih
+    # odstupa od nje (npr. N=10, beta=0.2 -> 3/13 = 0.231), pa bi tacke inace
+    # stajale na pogresnim apscisama.
     xs = [_realized(summary, b) for b in betas]
     fig, ax = plt.subplots(figsize=(7, 4.5))
     for ov in OVERLAYS:
@@ -438,16 +445,23 @@ def table_profiles(ablation, out):
 
 
 def _profile_table(rows, field, title, fmt, out):
-    # 7.2: ponasanje agregacionih funkcija po Byzantine profilima vrednosti
+    # 7.2: ponasanje agregacionih funkcija po Byzantine profilima vrednosti.
+    # D7: ablacija sada ukrsta i overlay strategiju, jer spec 7.2 trazi analizu
+    # koliko OVERLAY DEGRADACIJA utice na efikasnost robusnih estimatora. Bez
+    # overlay-a kao dimenzije reda tabela bi usrednjavala preko strategija i
+    # sakrila upravo taj efekat.
     profiles = sorted({r["byzantine_profile"] for r in rows})
+    overlays = [o for o in OVERLAYS if any(r.get("overlay") == o for r in rows)]
     lines = [f"## {title}", "",
-             "| agregacija | " + " | ".join(profiles) + " |",
-             "|---|" + "---|" * len(profiles)]
-    for aggregation in AGGS:
-        cells = [format(_mean(_sel(rows, aggregation=aggregation,
-                                   byzantine_profile=p), field), fmt)
-                 for p in profiles]
-        lines.append(f"| {aggregation} | " + " | ".join(cells) + " |")
+             "| strategija | agregacija | " + " | ".join(profiles) + " |",
+             "|---|---|" + "---|" * len(profiles)]
+    for overlay in overlays:
+        for aggregation in AGGS:
+            cells = [format(_mean(_sel(rows, overlay=overlay,
+                                       aggregation=aggregation,
+                                       byzantine_profile=p), field), fmt)
+                     for p in profiles]
+            lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) + " |")
     _write(out, lines + [""])
 
 
@@ -467,24 +481,28 @@ def table_profile_convergence(ablation, out):
     # -1 znaci da sistem nikada nije dostigao prag, pa se broji odvojeno
     if not ablation:
         return
+    # D7: i ovde overlay ulazi kao dimenzija reda (vidi _profile_table)
     profiles = sorted({r["byzantine_profile"] for r in ablation})
+    overlays = [o for o in OVERLAYS if any(r.get("overlay") == o for r in ablation)]
     lines = ["## 7.2 Vreme konvergencije po profilu", "",
-             "| agregacija | " + " | ".join(profiles) + " |",
-             "|---|" + "---|" * len(profiles)]
-    for aggregation in AGGS:
-        cells = []
-        for profile in profiles:
-            times = [r["convergence_time"] for r in
-                     _sel(ablation, aggregation=aggregation, byzantine_profile=profile)]
-            reached = [t for t in times if t >= 0]
-            if not reached:
-                cells.append("nikad")
-            elif len(reached) == len(times):
-                cells.append(f"{mean(reached):.1f}")
-            else:
-                cells.append(f"{mean(reached):.1f} ({len(times) - len(reached)}/"
-                             f"{len(times)} nikad)")
-        lines.append(f"| {aggregation} | " + " | ".join(cells) + " |")
+             "| strategija | agregacija | " + " | ".join(profiles) + " |",
+             "|---|---|" + "---|" * len(profiles)]
+    for overlay in overlays:
+        for aggregation in AGGS:
+            cells = []
+            for profile in profiles:
+                times = [r["convergence_time"] for r in
+                         _sel(ablation, overlay=overlay, aggregation=aggregation,
+                              byzantine_profile=profile)]
+                reached = [t for t in times if t >= 0]
+                if not reached:
+                    cells.append("nikad")
+                elif len(reached) == len(times):
+                    cells.append(f"{mean(reached):.1f}")
+                else:
+                    cells.append(f"{mean(reached):.1f} ({len(times) - len(reached)}/"
+                                 f"{len(times)} nikad)")
+            lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) + " |")
     _write(out, lines + [""])
 
 
@@ -1161,6 +1179,9 @@ def main() -> None:
     ablation = load(args.ablation) if os.path.exists(args.ablation) else []
     eclipse = load(eclipse_path) if os.path.exists(eclipse_path) else []
 
+    # tabele poglavlja 7, redom kako se u njemu pojavljuju
+    # D1: prvo preslikavanje nominalne u realizovanu betu, da se ostale tabele
+    # sa "b=..." zaglavljima citaju sa ispravnim apscisama
     table_realized_beta(summary, args.tables)
     table_error_by_beta(summary, args.tables)
     table_profile_error(ablation, args.tables)

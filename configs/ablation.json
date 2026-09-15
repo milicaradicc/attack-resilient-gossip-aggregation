@@ -3,9 +3,11 @@
     15
   ],
   "beta": [
-    0.2
+    0.3
   ],
   "overlay": [
+    "random",
+    "sybil_resistant",
     "eclipse_resistant"
   ],
   "aggregation": [
@@ -22,7 +24,9 @@
   "seeds": [
     1,
     2,
-    3
+    3,
+    4,
+    5
   ],
   "activate_round": 1
 }
