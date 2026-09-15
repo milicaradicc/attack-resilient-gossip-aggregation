@@ -12,11 +12,12 @@ def get_strategy(
     max_peers: int,
     params: Optional[IdentityParams] = None,
     seed: int = 0,
+    fanout: int = 0,
 ) -> SamplingStrategy:
     if name == "random":
-        return RandomStrategy(max_peers, seed)
+        return RandomStrategy(max_peers, seed, fanout)
     if name == "sybil_resistant":
-        return SybilResistantStrategy(max_peers, params)
+        return SybilResistantStrategy(max_peers, params, fanout)
     if name == "eclipse_resistant":
-        return EclipseResistantStrategy(max_peers, params)
+        return EclipseResistantStrategy(max_peers, params, fanout)
     raise ValueError(f"unknown strategy: {name}")

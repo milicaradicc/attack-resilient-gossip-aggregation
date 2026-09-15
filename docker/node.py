@@ -23,10 +23,10 @@ from sampling import get_strategy
 def _get(url):
     try:
         with urllib.request.urlopen(url, timeout=10) as r:
-            return r.status, json.loads(r.read()) # status code and body
-    except urllib.error.HTTPError as e: # the server answered with an error code
+            return r.status, json.loads(r.read()) 
+    except urllib.error.HTTPError as e: 
         return e.code, None
-    except (urllib.error.URLError, ConnectionError, OSError): # the server did not answer
+    except (urllib.error.URLError, ConnectionError, OSError):
         return 503, None
 
 
@@ -44,8 +44,6 @@ def _post(url, obj):
 
 
 def _block_get(url, poll=0.05):
-    # the request is repeated until a 200 comes back; fifty milliseconds so the
-    # other side does not get flooded
     while True:
         status, body = _get(url)
         if status == 200:
@@ -108,7 +106,8 @@ def run_honest(base, node_id, cfg, job, store, addresses):
 
     agg_kwargs = {"alpha": cfg["trim_alpha"]} if cfg["aggregation"] == "trimmed_mean" else {}
     aggregation = get_aggregation(cfg["aggregation"], **agg_kwargs)
-    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], params, cfg.get("seed", 0))
+    strategy = get_strategy(cfg["strategy"], cfg["peer_set_size"], params, cfg.get("seed", 0),
+                            cfg.get("gossip_fanout", 0))
     timeout_rounds = cfg["timeout_rounds"]
     participants = cfg["participants"]
 

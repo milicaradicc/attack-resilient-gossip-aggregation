@@ -7,14 +7,16 @@ from core.node import Node
 from identity.pow import verify_pow
 from identity.params import IdentityParams
 from identity.scoring import identity_score
+from sampling.base import choose_one, select_fanout
 
 
 class SybilResistantStrategy:
     name = "sybil_resistant"
 
-    def __init__(self, max_peers: int, params: IdentityParams):
+    def __init__(self, max_peers: int, params: IdentityParams, fanout: int = 0):
         self.max_peers = max_peers
         self.params = params
+        self.fanout = fanout
 
     def pow_valid(self, node: Node, candidate: int) -> bool:
         obs = node.observations.get(candidate)
@@ -61,5 +63,8 @@ class SybilResistantStrategy:
     def refresh_peers(self, node: Node, round_now: int, rng: random.Random) -> None:
         return None
 
+    def choose_gossip_target(self, node: Node, rng: random.Random) -> Optional[int]:
+        return choose_one(node, rng)
+
     def select_gossip_peers(self, node: Node, rng: random.Random) -> List[int]:
-        return list(node.peers)
+        return select_fanout(node, rng, self.fanout)

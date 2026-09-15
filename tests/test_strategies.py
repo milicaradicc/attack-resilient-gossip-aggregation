@@ -20,7 +20,6 @@ PARAMS = IdentityParams(
 
 
 def _nonce(identity: int) -> int:
-    # simulira ono sto bi identitet sam vec bio resio i predstavio u ponudi
     return solve_pow(str(identity), PARAMS.pow_difficulty_bits)
 
 
@@ -36,7 +35,6 @@ def test_valid_candidate_accepted():
 
 
 def test_candidate_without_pow_rejected():
-    # nikad nije predstavio nonce (nema ga u sopstvenoj ponudi)
     s = SybilResistantStrategy(7, PARAMS)
     n = _node()
     n.observations[5] = Observation(first_seen_round=0, last_seen_round=20)
@@ -80,8 +78,6 @@ def test_bucket_full_replaces_weaker():
     n = _node()
     n.observations[5] = Observation(first_seen_round=0, last_seen_round=20, nonce=_nonce(5))
     b = bucket_of(str(5), PARAMS.num_buckets)
-    # clanovi bucketa namerno ostaju bez nonce-a (nikad nisu predstavili PoW),
-    # pa im je skor slabiji od kandidata 5 — isto kao u originalnom testu
     n.peers = _same_bucket_ids(b, PARAMS.max_per_bucket, exclude={5})
 
     eclipse = EclipseResistantStrategy(7, PARAMS)
@@ -104,8 +100,6 @@ def test_bucket_full_rejects_weaker_candidate():
 
 
 def test_peer_set_never_exceeds_limit():
-    # 5.2.4: ponasanje pri popunjenom peer set-u — nijedna strategija ne sme
-    # da prekoraci K, ni tokom napada kada se kandidati guraju svake runde
     from core.config import spec_from
     from core.setup import build_world
     from in_process.engine import Engine
@@ -130,11 +124,6 @@ def test_peer_set_never_exceeds_limit():
 
 
 def test_eclipse_never_exceeds_bucket_limit():
-    # 5.2.4: kljucna tvrdnja — Eclipse-resistant strategija nikada ne POVECAVA
-    # koncentraciju peer-ova iz istog bucketa. Poredi se stanje posle punog
-    # pokretanja pod napadom sa pocetnom topologijom, jer pri n=10 regularan graf
-    # koji bi postovao ogranicenje ne postoji (videti poglavlje 8), pa pojedini
-    # cvorovi startuju sa prekoracenjem koje strategija ne moze da ukloni.
     from collections import Counter
     from core.config import spec_from
     from in_process.engine import Engine
@@ -166,8 +155,6 @@ def test_eclipse_never_exceeds_bucket_limit():
 
 
 def test_admission_decision_respects_bucket_limit():
-    # ista invarijanta na nivou pojedinacne odluke: nijedno prihvatanje kandidata
-    # ne sme povecati broj peer-ova iz njegovog bucketa iznad ogranicenja
     from collections import Counter
     from core import round_ops
     from core.config import spec_from
@@ -179,7 +166,6 @@ def test_admission_decision_respects_bucket_limit():
     world = build_world(spec)
     strategy = get_strategy("eclipse_resistant", spec.peer_set_size, world.id_params)
     limit = world.id_params.max_per_bucket
-    # (id, nonce) parovi — kandidat nosi svoj nonce u ponudi, kao u pravoj poruci
     candidates = [(i, world.nonces[i]) for i in sorted(world.byzantine | world.sybil)]
     for round_now in range(1, spec.num_rounds + 1):
         for node in world.nodes.values():
@@ -196,3 +182,24 @@ if __name__ == "__main__":
         if callable(fn) and getattr(fn, "__name__", "").startswith("test_"):
             fn()
     print("OK — testovi strategija zaštite prolaze")
+
+
+def test_all_strategies_implement_spec_interface():
+    from core.rng import make_rng
+    from sampling import get_strategy
+
+    for overlay in ("random", "sybil_resistant", "eclipse_resistant"):
+        s = get_strategy(overlay, 7, PARAMS, seed=1)
+        for metod in ("accept_peer", "evict_peer", "refresh_peers",
+                      "choose_gossip_target", "select_gossip_peers"):
+            assert callable(getattr(s, metod, None)), f"{overlay} nema {metod}"
+
+        n = _node()
+        n.peers = [1, 2, 3, 4, 5]
+        rng = make_rng(1, "gossip_target")
+        target = s.choose_gossip_target(n, rng)
+        assert target in n.peers, f"{overlay}: izabran peer van peer set-a"
+
+        prazan = _node()
+        assert s.choose_gossip_target(prazan, rng) is None, (
+            f"{overlay}: prazan peer set mora dati None")

@@ -19,13 +19,12 @@ from sampling import get_strategy
 
 
 def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
-    # svet (cvorovi, identiteti i njihovi nonce-ovi, scenario) sklapa se u
-    # core/setup.py, istom funkcijom koju koristi i distribuirani controller
     world = build_world(spec)
 
     metrics = ExperimentMetrics(x_star=world.x_star, num_buckets=spec.num_buckets,
                                 per_node=spec.per_node_metrics)
-    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params, spec.seed)
+    sampling = get_strategy(spec.overlay, spec.peer_set_size, world.id_params, spec.seed,
+                            spec.gossip_fanout)
     agg_kwargs = {"alpha": spec.trim_alpha} if spec.aggregation == "trimmed_mean" else {}
     aggregation = get_aggregation(spec.aggregation, **agg_kwargs)
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
@@ -42,15 +41,12 @@ def run_matrix(config_path: str, out_path: str, summary_path: str, json_path: st
     config_fields = CONFIG_FIELDS + extra
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     json_runs = []
-    # per-node zapis (4.9) se pise samo kada je trazen u konfiguraciji,
-    # jer nad punom matricom daje red velicine milion redova
     node_path = out_path.replace(".csv", "_nodes.csv") if any(
         sp.per_node_metrics for sp in specs) else None
     f_node = open(node_path, "w", newline="") if node_path else None
     w_node = csv.writer(f_node) if f_node else None
     if w_node:
         w_node.writerow(config_fields + NODE_FIELDS)
-    # 5.1.8: zapis dogadjaja (admission odluke, promene peer set-a, aktivacija napada)
     trace_path = out_path.replace(".csv", "_trace.csv") if any(
         sp.trace_events for sp in specs) else None
     f_trace = open(trace_path, "w", newline="") if trace_path else None
@@ -103,7 +99,6 @@ def main() -> None:
     parser.add_argument("--summary", default=None)
     parser.add_argument("--json", default=None)
     args = parser.parse_args()
-    # podrazumevano: results/inprocess/<ime configa>.csv
     out = args.out or os.path.join(
         "results", "inprocess",
         os.path.splitext(os.path.basename(args.config))[0] + ".csv")

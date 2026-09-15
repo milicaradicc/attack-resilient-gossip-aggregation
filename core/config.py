@@ -52,6 +52,7 @@ class RunSpec:
     low_bias: float = 5.0
     eclipse_targets: int = 0
     partition_groups: int = 0
+    gossip_fanout: int = 0
     delay_rounds: int = 0
     churn_offline: int = 1
     per_node_metrics: bool = False
@@ -87,8 +88,6 @@ def _activate_round(c: Dict[str, Any], override: Dict[str, Any]) -> int:
 
 
 def _spec_fields(c, override=None):
-    # jedno mesto koje preslikava ucitanu konfiguraciju u polja RunSpec-a;
-    # koriste ga i load_matrix (puna matrica) i spec_from (pojedinacni RunSpec)
     return dict(
         n_honest=c["n_honest"][0], beta=c["beta"][0], overlay=c["overlay"][0],
         aggregation=c["aggregation"][0], seed=c["seeds"][0],
@@ -108,15 +107,13 @@ def _spec_fields(c, override=None):
         value_high=c["value_high"], discovery_offers=c["discovery_offers"],
         extreme_offset=c["extreme_offset"], random_low=c["random_low"],
         random_high=c["random_high"], low_bias=c["low_bias"],
-        eclipse_targets=c["eclipse_targets"], partition_groups=c["partition_groups"], delay_rounds=c["delay_rounds"], churn_offline=c["churn_offline"],
+        eclipse_targets=c["eclipse_targets"], partition_groups=c["partition_groups"], gossip_fanout=c["gossip_fanout"], delay_rounds=c["delay_rounds"], churn_offline=c["churn_offline"],
         per_node_metrics=c["per_node_metrics"], trace_events=c["trace_events"],
     )
 
 
-# parametri napada koji se, ako su u konfiguraciji zadati kao lista, tretiraju
-# kao dodatne dimenzije matrice (dopunski ablacioni scenariji iz tabele 6.2)
 SWEEPABLE = ("flooding", "churn_period", "unresponsive_p", "selective_p", "delay_rounds", "churn_offline", "discovery_offers",
-             "eclipse_targets", "partition_groups", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
+             "eclipse_targets", "partition_groups", "gossip_fanout", "trim_alpha", "max_per_bucket", "score_threshold", "age_min", "pow_difficulty_bits")
 
 
 def _sweep_values(c, key, base):
@@ -147,8 +144,6 @@ def load_matrix(path: str) -> List[RunSpec]:
 
 
 def spec_from(**overrides) -> RunSpec:
-    # RunSpec od podrazumevanih vrednosti (configs/defaults.json) uz navedene izmene;
-    # koriste ga testovi i distribuirani controller (jedan scenario iz env varijabli)
     fields = _spec_fields(load_defaults())
     fields.update(overrides)
     return RunSpec(**fields)

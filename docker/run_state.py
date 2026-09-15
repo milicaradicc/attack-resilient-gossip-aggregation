@@ -77,6 +77,7 @@ class ControllerState:
             "num_rounds": self.num_rounds, "n_honest": self.n,
             "strategy": self.strategy_name, "aggregation": self.aggregation_name,
             "seed": self.spec.seed,
+            "gossip_fanout": self.spec.gossip_fanout,
             "trim_alpha": self.trim_alpha, "timeout_rounds": self.timeout_rounds,
             "peer_set_size": self.cfg.peer_set_size,
             "trace_events": self.spec.trace_events,
