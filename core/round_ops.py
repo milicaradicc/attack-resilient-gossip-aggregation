@@ -58,7 +58,7 @@ def admit(node, sampling, round_now: int, offered: List = None,
     considered = 0
     for candidate, nonce in exchanges:
         observe(node, candidate, round_now, exchanged=False, nonce=nonce)
-        if candidate in node.peers:
+        if candidate == node.node_id or candidate in node.peers:
             continue
         considered += 1
         if sampling.accept_peer(node, candidate, round_now):

@@ -196,13 +196,20 @@ class ExperimentMetrics:
         return mean(vals) if vals else 0.0
 
     def rejection_breakdown(self):
-        total = sum(r.rejected for r in self.rows) or 1
-        return {
+        rejected = sum(r.rejected for r in self.rows)
+        total = rejected or 1
+        breakdown = {
             "pow": sum(r.rej_invalid_pow for r in self.rows) / total,
             "age": sum(r.rej_too_young for r in self.rows) / total,
             "score": sum(r.rej_low_score for r in self.rows) / total,
             "bucket": sum(r.rej_bucket_full for r in self.rows) / total,
         }
+        if rejected and abs(sum(breakdown.values()) - 1.0) > 1e-9:
+            raise ValueError(
+                "razlozi odbijanja ne daju celinu: "
+                f"{sum(breakdown.values()):.6f} umesto 1.0 — verovatno je uveden "
+                "nov razlog bez kolone u FIELDS")
+        return breakdown
 
     def to_csv_rows(self):
         return [[r.round, r.err_rel, r.spread, r.sybil_penetration, r.eclipse_rate,
