@@ -55,10 +55,12 @@ def admit(node, sampling, round_now: int, offered: List = None,
         flooded = sum(1 for c, _ in exchanges if c >= FLOOD_BASE)
         if flooded:
             trace.flooding(round_now, node.node_id, flooded)
+    considered = 0
     for candidate, nonce in exchanges:
         observe(node, candidate, round_now, exchanged=False, nonce=nonce)
         if candidate in node.peers:
             continue
+        considered += 1
         if sampling.accept_peer(node, candidate, round_now):
             victim = sampling.evict_peer(node, round_now, candidate)
             if victim is not None:
@@ -77,7 +79,7 @@ def admit(node, sampling, round_now: int, offered: List = None,
                 transport.reject(round_now, node.node_id, candidate, why)
             if trace is not None:
                 trace.reject(round_now, node.node_id, candidate, why)
-    return len(exchanges), sum(reasons.values()), reasons
+    return considered, sum(reasons.values()), reasons
 
 
 def heartbeat(node, peers: List[int], round_now: int, timeout_rounds: int,
