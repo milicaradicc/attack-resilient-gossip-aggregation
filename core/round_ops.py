@@ -65,10 +65,6 @@ def admit(node, sampling, round_now: int, offered: List = None,
                 node.peers.remove(victim)
                 if trace is not None:
                     trace.evict(round_now, node.node_id, victim, "replaced_by", candidate)
-            elif len(node.peers) >= sampling.max_peers:
-                if trace is not None:
-                    trace.reject(round_now, node.node_id, candidate, "peer_set_full")
-                continue
             node.peers.append(candidate)
             if transport is not None:
                 transport.accept(round_now, node.node_id, candidate)
