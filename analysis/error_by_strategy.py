@@ -75,3 +75,37 @@ def table_error_by_beta(summary, out):
                      for b in BETAS]
             lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) + " |")
     _write(out, lines + [""])
+
+
+def table_benign_baseline(summary, out):
+    lines = ["## 7.1 Benigna bazna greska (beta=0, bez napadaca)", "",
+             "| strategija | " + " | ".join(AGGS) + " |",
+             "|---|" + "---|" * len(AGGS)]
+    for overlay in OVERLAYS:
+        cells = []
+        for aggregation in AGGS:
+            v = _mean(_sel(summary, overlay=overlay, aggregation=aggregation, beta=0.0),
+                      "final_err_rel")
+            # prag iz 5.2.6 je 0.01; oznacava se sta ga prelazi
+            cells.append(f"{v:.2e}" + (" (iznad 0.01)" if v > 0.01 else ""))
+        lines.append(f"| {overlay} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])
+
+
+def table_error_above_baseline(summary, out):
+    lines = ["## 7.1 Greska umanjena za benignu baznu liniju", "",
+             "| strategija | agregacija | " + " | ".join(f"b={b}" for b in BETAS if b > 0) + " |",
+             "|---|---|" + "---|" * len([b for b in BETAS if b > 0])]
+    for overlay in OVERLAYS:
+        for aggregation in AGGS:
+            baseline = _mean(_sel(summary, overlay=overlay, aggregation=aggregation,
+                                  beta=0.0), "final_err_rel")
+            cells = []
+            for b in BETAS:
+                if b <= 0:
+                    continue
+                v = _mean(_sel(summary, overlay=overlay, aggregation=aggregation, beta=b),
+                          "final_err_rel")
+                cells.append(f"{v - baseline:+.4f}")
+            lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) + " |")
+    _write(out, lines + [""])

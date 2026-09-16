@@ -10,6 +10,8 @@ from analysis.common import table_realized_beta
 # 7.1
 from analysis.error_by_strategy import (
     fig_err_over_time,
+    table_benign_baseline,
+    table_error_above_baseline,
     fig_error_boxplot,
     fig_final_error_bars,
     table_error_by_beta)
@@ -92,6 +94,8 @@ from analysis.statistical_analysis import (
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    # podrazumevano se izvestaj pravi iz rezultata dobijenih u Docker okruzenju;
+    # --source inprocess prebacuje na in-process rezultate
     parser.add_argument("--source", default="docker", choices=["docker", "inprocess"])
     parser.add_argument("--round", default=None)
     parser.add_argument("--summary", default=None)
@@ -125,6 +129,8 @@ def main() -> None:
 
     table_realized_beta(summary, args.tables)
     table_error_by_beta(summary, args.tables)
+    table_benign_baseline(summary, args.tables)
+    table_error_above_baseline(summary, args.tables)
     table_profile_error(ablation, args.tables)
     table_profile_stability(ablation, args.tables)
     table_profile_convergence(ablation, args.tables)

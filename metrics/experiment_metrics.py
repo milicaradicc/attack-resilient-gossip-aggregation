@@ -9,7 +9,7 @@ from typing import Dict, List
 from identity.buckets import bucket_of
 
 FIELDS = [
-    "round", "err_rel", "spread", "sybil_penetration", "eclipse_rate", "isolation",
+    "round", "err_rel", "spread", "sybil_penetration", "eclipse_rate", "malicious_share",
     "peer_diversity", "bucket_occupancy", "avg_estimate",
     "control_msgs", "data_msgs", "offered", "rejected",
     "rej_invalid_pow", "rej_too_young", "rej_low_score", "rej_bucket_full", "timeouts",
@@ -57,7 +57,7 @@ class RoundMetrics:
     spread: float
     sybil_penetration: float
     eclipse_rate: float
-    isolation: float
+    malicious_share: float
     peer_diversity: float
     bucket_occupancy: float
     avg_estimate: float
@@ -96,12 +96,11 @@ class ExperimentMetrics:
         pen = mean(self._sybil_share(n, scenario) for n in nodes.values())
         eclipsed = sum(1 for n in nodes.values() if not self._has_honest_peer(n, scenario))
         eclipse_rate = eclipsed / len(nodes)
-        # D3
-        isolation = mean(self._malicious_share(n, scenario) for n in nodes.values())
+        malicious_share = mean(self._malicious_share(n, scenario) for n in nodes.values())
         diversity = mean(self._diversity(n) for n in nodes.values())
         occupancy = mean(self._bucket_occupancy(n) for n in nodes.values())
         rm = RoundMetrics(
-            round_no, err, spread, pen, eclipse_rate, isolation, diversity, occupancy, avg,
+            round_no, err, spread, pen, eclipse_rate, malicious_share, diversity, occupancy, avg,
             c.control_msgs, c.data_msgs, c.offered, c.rejected,
             c.rej_invalid_pow, c.rej_too_young, c.rej_low_score, c.rej_bucket_full, c.timeouts,
         )
