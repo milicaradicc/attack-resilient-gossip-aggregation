@@ -18,7 +18,7 @@ class Engine:
         self.rng = rng
         self.nonces = nonces
         self.timeout_rounds = timeout_rounds
-        self.trace = trace # 5.1.8: optional event log
+        self.trace = trace 
 
     def _discover(self, round_now, transport=None):
         offered = 0
@@ -41,19 +41,8 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
-
-        out = {}
-        for hid, node in self.nodes.items():
-            out[hid] = self.scenario.broadcast_value(hid, node.estimate, round_now)
-        for m in sorted(self.scenario.malicious_ids): 
-            value = self.scenario.broadcast_value(m, 0.0, round_now)
-            if value is NO_MESSAGE:
-                continue
-            out[m] = value
-            if self.trace is not None and self.scenario.active(round_now):
-                self.trace.malicious_broadcast(
-                    round_now, m, value, self.scenario.params.byzantine_profile)
-        return out
+        return round_ops.emitted_values(self.nodes, self.scenario, round_now,
+                                        trace=self.trace)
 
     def _heartbeat(self, node, peers, round_now, transport=None):
         return round_ops.heartbeat(node, peers, round_now, self.timeout_rounds,
@@ -93,14 +82,14 @@ class Engine:
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng) # peers for this exchange
+                peers = self.sampling.select_gossip_peers(node, self.rng) # peer-ovi za ovu razmenu
                 responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
                 round_ops.deliver(node, responders, emitted, r, transport=transport)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)
-                node.estimate = self.aggregation.aggregate(own[hid], received) # new estimate
+                node.estimate = self.aggregation.aggregate(own[hid], received) # nova procena
                 if self.trace is not None:
                     self.trace.estimate(r, hid, node.estimate)
 

@@ -105,11 +105,11 @@ def test_convergence_time_measured_from_given_round():
     metrics = run_single(spec)
     od_napada = metrics.convergence_time(spec.epsilon, since=spec.activate_round + 1)
     assert od_napada == -1, "pod napadom bez zastite ne sme konvergirati"
-    assert metrics.rows[-1].err_rel > spec.epsilon, "greska na kraju je iznad praga"
-    aktivacija = next(r for r in metrics.rows if r.round == spec.activate_round)
-    posle = next(r for r in metrics.rows if r.round == spec.activate_round + 1)
-    assert aktivacija.err_rel < spec.epsilon, "runda aktivacije vec pokazuje napad"
-    assert posle.err_rel > aktivacija.err_rel * 2, "napad se ne vidi ni posle aktivacije"
+    assert metrics.rows[-1].err_rel > spec.epsilon, "error na kraju je iznad praga"
+    activation = next(r for r in metrics.rows if r.round == spec.activate_round)
+    after = next(r for r in metrics.rows if r.round == spec.activate_round + 1)
+    assert activation.err_rel < spec.epsilon, "round_no aktivacije vec pokazuje napad"
+    assert after.err_rel > activation.err_rel * 2, "napad se ne vidi ni after aktivacije"
 
 
 def test_convergence_time_returns_sentinel_when_never_reached():
@@ -124,10 +124,10 @@ def test_convergence_matches_recovery():
     spec = spec_from(n_honest=20, beta=0.3, overlay="random",
                      aggregation="mean", seed=1)
     metrics = run_single(spec)
-    konvergencija = metrics.convergence_time(spec.epsilon, since=spec.activate_round)
-    oporavak = metrics.recovery_time(spec.epsilon, since=spec.activate_round)
-    assert konvergencija == oporavak
-    assert konvergencija == -1, "sistem se nije trajno oporavio"
+    convergence = metrics.convergence_time(spec.epsilon, since=spec.activate_round)
+    recovery = metrics.recovery_time(spec.epsilon, since=spec.activate_round)
+    assert convergence == recovery
+    assert convergence == -1, "sistem se nije trajno oporavio"
     assert metrics.rows[-1].err_rel > spec.epsilon
 
 

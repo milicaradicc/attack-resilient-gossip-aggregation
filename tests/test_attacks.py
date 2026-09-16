@@ -54,12 +54,12 @@ def test_structural_defense_reduces_penetration():
 def test_defense_beats_robust_aggregation_alone():
     from statistics import mean as _mean
     seeds = (1, 2, 3, 4, 5)
-    zasticeno = _mean(run("sybil_resistant", "mean", **{**SMALL, "seed": s})[-1]
+    protected = _mean(run("sybil_resistant", "mean", **{**SMALL, "seed": s})[-1]
                       .sybil_penetration for s in seeds)
-    nezasticeno = _mean(run("random", "mean", **{**SMALL, "seed": s})[-1]
+    unprotected = _mean(run("random", "mean", **{**SMALL, "seed": s})[-1]
                         .sybil_penetration for s in seeds)
-    assert nezasticeno > 0.0
-    assert zasticeno < nezasticeno / 2
+    assert unprotected > 0.0
+    assert protected < unprotected / 2
 
     protected = run("sybil_resistant", "mean", **SMALL)[-1]
     unprotected = run("random", "mean", **SMALL)[-1]
@@ -72,7 +72,7 @@ def test_robust_aggregation_insufficient_without_structure():
     assert unprotected.sybil_penetration > 0.2, "napadaci moraju uci u peer set"
     assert unprotected.err_rel > protected.err_rel, (
         "bez admission kontrole median mora biti losiji nego sa njom")
-    assert unprotected.err_rel > 0.05, "greska mora premasiti prag iz 3.10"
+    assert unprotected.err_rel > 0.05, "error mora premasiti prag iz 3.10"
 
 
 if __name__ == "__main__":

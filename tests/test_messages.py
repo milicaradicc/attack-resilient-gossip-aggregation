@@ -12,7 +12,7 @@ from in_process.matrix import run_single
 
 
 def test_message_has_required_fields():
-    # 5.1.5: every message carries a type, a round, a source and a payload
+    # 5.1.5: svaka poruka nosi tip, rundu, izvor i payload
     m = messages.data(round_now=3, source=7, value=99.5)
     assert m.type == messages.AGGREGATE and m.round == 3
     assert m.source == 7 and m.payload == 99.5
@@ -26,7 +26,7 @@ def test_control_and_data_are_distinguished():
 
 
 def test_transport_separates_classes():
-    # 5.1.5: the transport layer counts messages per class
+    # 5.1.5: transportni sloj broji poruke po klasi
     from core.transport import Transport
     t = Transport()
     t.offer(1, 0, 2)
@@ -36,7 +36,7 @@ def test_transport_separates_classes():
 
 
 def test_transport_delivers_to_mailbox():
-    # the sender drops it in, the receiver takes it out of its own mailbox
+    # posiljalac je ostavlja, primalac je uzima iz sopstvenog sanducica
     from core.transport import Transport
     t = Transport()
     t.send(messages.data(1, 5, 42.0, target=3))
@@ -47,7 +47,7 @@ def test_transport_delivers_to_mailbox():
 
 
 def test_transport_filters_by_type():
-    # one phase of the round takes only its own type; the rest waits
+    # jedna faza runde uzima samo svoj tip poruke; ostalo ceka
     from core.transport import Transport
     t = Transport()
     t.send(messages.control(messages.PEER_EXCHANGE, 1, 8, target=0))
@@ -58,7 +58,7 @@ def test_transport_filters_by_type():
 
 
 def test_unread_messages_still_counted():
-    # rejections sent to attackers are never picked up, but they still count
+    # odbijenice poslate napadacima niko ne preuzima, ali se i dalje broje
     from core.transport import Transport
     t = Transport()
     t.send(messages.control(messages.PEER_REJECT, 1, 0, target=99, payload="too_young"))
@@ -67,7 +67,7 @@ def test_unread_messages_still_counted():
 
 
 def test_defense_raises_control_but_not_data():
-    # 5.1.5: the defence raises control traffic while the aggregation messages stay the same
+    # 5.1.5: odbrana podize kontrolni saobracaj dok agregacione poruke ostaju iste
     base = dict(n_honest=20, beta=0.3, aggregation="trimmed_mean", seed=1)
     plain = run_single(spec_from(overlay="random", **base))
     guarded = run_single(spec_from(overlay="eclipse_resistant", **base))
@@ -76,8 +76,8 @@ def test_defense_raises_control_but_not_data():
 
 
 def test_value_travels_as_addressed_message():
-    # 5.1.5: the aggregation value travels as a message from the neighbour to the
-    # node, with the source and the destination written into it
+    # 5.1.5: agregaciona vrednost putuje kao poruka od suseda ka cvoru, sa
+    # upisanim izvorom i odredistem
     from core import round_ops
     from core.transport import Transport
 
@@ -99,7 +99,7 @@ def test_value_travels_as_addressed_message():
 
 
 def test_unknown_peer_sends_nothing():
-    # fake identities (flooding) have no emitted value, so they send no message
+    # lazni identiteti (flooding) nemaju emitovanu vrednost, pa ne salju poruku
     from core import round_ops
     from core.transport import Transport
 
@@ -114,7 +114,7 @@ def test_unknown_peer_sends_nothing():
 
 
 def test_named_actions_produce_expected_types():
-    # the protocol actions are named, and each builds a message of its own type
+    # protokolarne akcije su imenovane i svaka sastavlja poruku sopstvenog tipa
     from core.transport import Transport
     t = Transport()
     t.offer(1, 8, 0)
@@ -133,10 +133,10 @@ def test_named_actions_produce_expected_types():
 
 
 def test_discovery_is_request_and_response():
-    # 5.1.5: the node sends a request for candidates, and the offers arrive as
-    # separate messages from the identity advertising itself; admit takes them out
-    # of the mailbox. The two halves are separate calls precisely so that the node
-    # cannot hold the answer before it has asked.
+    # 5.1.5: cvor salje zahtev za kandidatima, a ponude stizu kao zasebne poruke
+    # od identiteta koji se reklamira; admit ih uzima iz sanducica. Dve polovine
+    # su odvojeni pozivi bas zato da cvor ne moze da drzi odgovor pre nego sto je
+    # pitao.
     from core import round_ops
     from core.transport import Transport
 
@@ -146,12 +146,12 @@ def test_discovery_is_request_and_response():
 
     t = Transport()
     node = _N()
-    # first half: the node sends the request and still knows nothing
+    # prva polovina: cvor salje zahtev i jos nista ne zna
     round_ops.send_peer_request(node, round_now=3, transport=t)
     assert t.count(messages.PEER_REQUEST) == 1, "the request is a single message"
     assert t.receive(0, messages.PEER_EXCHANGE) == [], (
         "the node must not hold candidates before the answer arrives")
-    # second half: the answer arrives as messages, each carrying its own PoW nonce
+    # druga polovina: odgovor stize kao poruke, svaka sa sopstvenim PoW nonce-om
     round_ops.receive_offers(node, [(5, 111), (9, 222)], round_now=3, transport=t)
     offers = t.receive(0, messages.PEER_EXCHANGE)
     assert [m.source for m in offers] == [5, 9], "the source is the identity being offered"
@@ -176,7 +176,7 @@ def test_all_control_types_are_used():
            world.scenario, spec.num_rounds, metrics,
            make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation),
            world.nonces, timeout_rounds=spec.timeout_rounds).run()
-    # discovery, admission, rejection and heartbeat all contribute to control traffic
+    # discovery, admission, odbijanje i heartbeat doprinose kontrolnom saobracaju
     assert any(r.offered > 0 for r in metrics.rows)
     assert any(r.rejected > 0 for r in metrics.rows)
     assert all(r.control_msgs >= r.offered for r in metrics.rows if r.round >= 1)

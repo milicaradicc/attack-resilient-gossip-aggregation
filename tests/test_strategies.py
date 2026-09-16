@@ -174,7 +174,7 @@ def test_admission_decision_respects_bucket_limit():
             after = Counter(strategy.bucket(p) for p in node.peers)
             for bucket, count in after.items():
                 assert count <= max(limit, before.get(bucket, 0)), (
-                    f"runda {round_now}: bucket {bucket} narastao na {count}")
+                    f"round_no {round_now}: bucket {bucket} narastao na {count}")
 
 
 if __name__ == "__main__":
@@ -200,6 +200,6 @@ def test_all_strategies_implement_spec_interface():
         target = s.choose_gossip_target(n, rng)
         assert target in n.peers, f"{overlay}: izabran peer van peer set-a"
 
-        prazan = _node()
-        assert s.choose_gossip_target(prazan, rng) is None, (
-            f"{overlay}: prazan peer set mora dati None")
+        empty_node = _node()
+        assert s.choose_gossip_target(empty_node, rng) is None, (
+            f"{overlay}: empty_node peer set mora dati None")

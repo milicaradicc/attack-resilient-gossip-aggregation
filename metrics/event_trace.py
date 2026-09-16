@@ -14,7 +14,7 @@ ATTACK = "attack_activated"
 ESTIMATE = "estimate"
 BROADCAST = "malicious_broadcast"
 CHURN = "churn_reset"
-CHURN_LEAVE = "churn_leave" # evict reason used when an identity leaves the network
+CHURN_LEAVE = "churn_leave"
 FLOOD = "flooding"
 
 
@@ -33,45 +33,44 @@ class EventTrace:
     events: List[TraceEvent] = field(default_factory=list)
 
     def accept(self, round_now, node_id, peer_id):
-        # the candidate was admitted into the peer set
+        # kandidat je primljen u peer set
         self.events.append(TraceEvent(round_now, ACCEPT, node_id, peer_id, "", None))
 
     def reject(self, round_now, node_id, peer_id, reason):
-        # candidate rejected; detail carries the reason (invalid_pow, too_young,
+        # kandidat odbijen; detail nosi razlog (invalid_pow, too_young,
         # low_score, bucket_full)
         self.events.append(TraceEvent(round_now, REJECT, node_id, peer_id, reason, None))
 
     def evict(self, round_now, node_id, peer_id, reason, replacement):
-        # a peer was removed from the peer set. The reason is one of:
-        #   replaced_by:<id> - replaced by a better candidate (admission)
-        #   timeout          - stayed silent too long, the defence dropped it
-        #   churn_leave      - the identity left the network (3.8), not the node's decision
-        # Without the third value the log would not be consistent: after the churn
-        # change a peer would vanish from the peer set with no event at all, so the
-        # record would show a second 'accept' of the same identity with no 'evict'
-        # in between.
+        # peer je uklonjen iz peer set-a. Razlog je jedan od:
+        #   replaced_by:<id> - zamenio ga je bolji kandidat (admission)
+        #   timeout          - predugo je cutao, odbrana ga je uklonila
+        #   churn_leave      - identitet je napustio mrezu (3.8), nije odluka cvora
+        # Bez trece vrednosti zapis ne bi bio konzistentan: posle churn promene
+        # peer bi nestao iz peer set-a bez ijednog dogadjaja, pa bi se u zapisu
+        # video drugi 'accept' istog identiteta bez 'evict' izmedju.
         detail = reason if replacement is None else f"{reason}:{replacement}"
         self.events.append(TraceEvent(round_now, EVICT, node_id, peer_id, detail, None))
 
     def attack_activated(self, round_now, malicious_count):
-        # the moment the attack becomes active
+        # trenutak u kome napad postaje aktivan
         self.events.append(
             TraceEvent(round_now, ATTACK, -1, None, "activated", float(malicious_count)))
 
     def estimate(self, round_now, node_id, value):
-        # the node's aggregation value at the end of the round
+        # agregaciona vrednost cvora na kraju runde
         self.events.append(TraceEvent(round_now, ESTIMATE, node_id, None, "", value))
 
     def malicious_broadcast(self, round_now, node_id, value, profile):
-        # the value a malicious node emitted that round, together with its behaviour profile
+        # vrednost koju je napadacki cvor emitovao te runde, uz profil ponasanja
         self.events.append(TraceEvent(round_now, BROADCAST, node_id, None, profile, value))
 
     def churn_reset(self, round_now, count):
-        # returning identities whose age was reset at every other node
+        # identiteti koji se vracaju i cija je starost resetovana kod svih ostalih cvorova
         self.events.append(TraceEvent(round_now, CHURN, -1, None, "reset", float(count)))
 
     def flooding(self, round_now, node_id, count):
-        # number of fake candidates injected at this node in that round
+        # broj laznih kandidata ubacenih kod ovog cvora u toj rundi
         self.events.append(TraceEvent(round_now, FLOOD, node_id, None, "candidates", float(count)))
 
     def csv_rows(self):

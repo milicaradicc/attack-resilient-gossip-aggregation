@@ -81,7 +81,7 @@ def test_trace_records_attacker_activity():
     syb = [e for e in emitted if e.value != spec.coordinated_value]
     assert byz, "Byzantine cvorovi moraju emitovati koordinisanu vrednost"
     assert all(spec.value_low <= e.value <= spec.value_high for e in syb), (
-        "Sybil vrednosti moraju ostati u legitimnom opsegu")
+        "Sybil values moraju ostati u legitimnom opsegu")
 
 
 def test_csv_rows_match_fields():

@@ -105,7 +105,7 @@ class Scenario:
             return 0
         return len(module.returning_ids(self.ctx, round_now))
 
-    def responds(self, identity: int, round_now: int, rng: random.Random,
+    def responds(self, identity: int, round_now: int, rng: random.Random = None,
                  target: int = None) -> bool:
         if identity >= FLOOD_BASE:
             return False

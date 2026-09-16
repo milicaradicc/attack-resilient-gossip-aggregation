@@ -18,10 +18,6 @@ TINY = os.path.join(ROOT, "configs", "tiny.json")
 
 
 class _OneJob:
-    # a minimal matrix of a single configuration: the HTTP layer
-    # (docker/http_api.py) knows nothing about how many jobs there are, it only
-    # asks for state_for/job_payload, so a full MatrixState loaded from a file is
-    # not needed here
     def __init__(self, spec):
         self.specs = [spec]
         self.state = ControllerState(
@@ -75,7 +71,6 @@ def _distributed(spec):
 
 
 def _tiny(beta):
-    # a configuration loaded from file, the same way the matrix loads it
     for s in load_matrix(TINY):
         if s.beta == beta:
             return s

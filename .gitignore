@@ -12,3 +12,5 @@ figures/
 *.iws
 *.ipr
 out/
+
+docker/docker-compose.yml
