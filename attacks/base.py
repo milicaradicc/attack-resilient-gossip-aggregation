@@ -26,8 +26,6 @@ class AttackContext:
         self.attacker_nodes = attacker_nodes if attacker_nodes is not None else {}
 
     def attacker_view(self, identity: int) -> Optional[float]:
-        # trenutna procena koju napadacki cvor drzi (ono sto je stvarno cuo od
-        # honest suseda) — koristi je delay napad za pravi stale information
         node = self.attacker_nodes.get(identity)
         return None if node is None else node.estimate
 
@@ -72,6 +70,10 @@ class BaseAttack:
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int,
                  target: Optional[int] = None) -> Optional[bool]:
+        return None
+
+    def sends_value_to(self, ctx: AttackContext, identity: int, target: int,
+                       round_now: int) -> Optional[bool]:
         return None
 
     def before_round(self, ctx: AttackContext, nodes: Dict[int, object],

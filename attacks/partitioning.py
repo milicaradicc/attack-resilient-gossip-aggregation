@@ -16,8 +16,8 @@ class PartitioningAttack(BaseAttack):
     def enabled(self, ctx: AttackContext) -> bool:
         return ctx.params.partition_groups > 1
 
-    def responds(self, ctx: AttackContext, identity: int, round_now: int,
-                 target: Optional[int] = None) -> Optional[bool]:
+    def sends_value_to(self, ctx: AttackContext, identity: int, target: int,
+                       round_now: int) -> Optional[bool]:
         p = ctx.params
         if p.partition_groups <= 1 or identity not in ctx.malicious_ids:
             return None

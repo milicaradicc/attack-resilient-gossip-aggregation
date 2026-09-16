@@ -10,9 +10,10 @@ class ValueStore:
         self._lock = threading.Lock()
         self._published = {} # (job, round) -> {"value": float|None, "responds": callable}
 
-    def publish(self, job: int, round_now: int, value, responds) -> None:
+    def publish(self, job: int, round_now: int, value, responds, sends_to=None) -> None:
         with self._lock:
-            self._published[(job, round_now)] = {"value": value, "responds": responds}
+            self._published[(job, round_now)] = {"value": value, "responds": responds,
+                                                 "sends_to": sends_to}
 
     def get(self, job: int, round_now: int):
         with self._lock:
@@ -52,8 +53,12 @@ def make_handler(store: ValueStore, node_id: int):
             ok = answers(requester) if callable(answers) else bool(answers)
             if not ok:
                 self._send(503, {})
-            else:
-                self._send(200, {"node_id": node_id, "value": entry["value"]})
+                return
+            sends_to = entry.get("sends_to")
+            value = entry["value"]
+            if callable(sends_to) and not sends_to(requester):
+                value = None
+            self._send(200, {"node_id": node_id, "value": value})
 
     return Handler
 

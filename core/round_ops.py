@@ -128,8 +128,11 @@ def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
 
 
 def deliver(node, responders: List[int], emitted: Dict[int, float],
-            round_now: int, transport=None) -> List[int]:
+            round_now: int, transport=None, scenario=None) -> List[int]:
     senders = [p for p in responders if p in emitted]
+    if scenario is not None:
+        senders = [p for p in senders
+                   if scenario.sends_value_to(p, node.node_id, round_now)]
     if transport is not None:
         for p in senders:
             transport.send_value(round_now, p, node.node_id, emitted[p])

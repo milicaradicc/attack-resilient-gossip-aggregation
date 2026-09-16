@@ -105,6 +105,16 @@ class Scenario:
             return 0
         return len(module.returning_ids(self.ctx, round_now))
 
+    def sends_value_to(self, identity: int, target: int, round_now: int) -> bool:
+        if not self.active(round_now) or identity not in self.malicious_ids:
+            return True
+        ctx = self.ctx
+        for module in self.active_modules():
+            decision = module.sends_value_to(ctx, identity, target, round_now)
+            if decision is not None:
+                return decision
+        return True
+
     def responds(self, identity: int, round_now: int, rng: random.Random = None,
                  target: int = None) -> bool:
         if identity >= FLOOD_BASE:

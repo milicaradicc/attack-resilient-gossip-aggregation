@@ -18,7 +18,7 @@ class Engine:
         self.rng = rng
         self.nonces = nonces
         self.timeout_rounds = timeout_rounds
-        self.trace = trace 
+        self.trace = trace # 5.1.8: opcioni zapis dogadjaja
 
     def _discover(self, round_now, transport=None):
         offered = 0
@@ -41,6 +41,8 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
+        # H9: ista logika koju koristi i distribuirana putanja — drzi se na
+        # jednom mestu (core/round_ops), da se dve putanje ne raziđu
         return round_ops.emitted_values(self.nodes, self.scenario, round_now,
                                         trace=self.trace)
 
@@ -85,7 +87,8 @@ class Engine:
                 peers = self.sampling.select_gossip_peers(node, self.rng) # peer-ovi za ovu razmenu
                 responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
-                round_ops.deliver(node, responders, emitted, r, transport=transport)
+                round_ops.deliver(node, responders, emitted, r, transport=transport,
+                                  scenario=self.scenario)
                 incoming = transport.receive(hid, messages.AGGREGATE)
                 received = [m.payload for m in incoming]
                 data_msgs += len(received)

@@ -61,8 +61,6 @@ def _block_post(url, obj, poll=0.05):
 
 def _fetch_value(addresses, peer: int, job: int, round_now: int,
                  participants: int, requester: int, poll=0.05):
-    # requester: B9 — odluka o odgovoru je po paru, pa trazilac mora da se
-    # predstavi; peer strana odlucuje da li bas njemu odgovara
     if peer >= participants:
         return None
     url = addresses.get(str(peer))
@@ -120,18 +118,24 @@ def run_honest(base, node_id, cfg, job, store, addresses):
 
         own = node.estimate
         store.publish(job, r, _sendable(scenario.broadcast_value(node_id, own, r)),
-                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who))
+                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who),
+                      sends_to=lambda who, _r=r: scenario.sends_value_to(node_id, who, _r))
+
+        fetched = {}
+
+        def peer_responds(p):
+            reply = _fetch_value(addresses, p, job, r, participants, node_id)
+            if reply is None:
+                return False
+            if reply["value"] is not None:
+                fetched[p] = reply["value"]
+            return True
 
         responders, timeouts = round_ops.heartbeat(
-            node, list(node.peers), r, timeout_rounds,
-            lambda p: scenario.responds(p, r, None, target=node_id),
+            node, list(node.peers), r, timeout_rounds, peer_responds,
             trace=trace, transport=transport)
 
-        values = {}
-        for p in list(responders):
-            reply = _fetch_value(addresses, p, job, r, participants, node_id)
-            if reply is not None and reply["value"] is not None:
-                values[p] = reply["value"]
+        values = {p: v for p, v in fetched.items() if p in responders}
 
         round_ops.deliver(node, responders, values, r, transport=transport)
         incoming = transport.receive(node_id, messages.AGGREGATE)
@@ -180,7 +184,8 @@ def run_malicious(base, node_id, cfg, job, store, addresses):
 
         store.publish(job, r,
                       _sendable(scenario.broadcast_value(node_id, att.estimate, r)),
-                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who))
+                      responds=lambda who, _r=r: scenario.responds(node_id, _r, None, target=who),
+                      sends_to=lambda who, _r=r: scenario.sends_value_to(node_id, who, _r))
 
 
 def run_matrix_node(base, node_id, advertise_host="127.0.0.1", port=0):
