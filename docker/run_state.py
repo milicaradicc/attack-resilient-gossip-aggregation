@@ -115,6 +115,7 @@ class ControllerState:
                 "selective_p": self.params.selective_p,
                 "unresponsive_p": self.params.unresponsive_p,
                 "eclipse_targets": self.params.eclipse_targets,
+                "sybil_rate": self.params.sybil_rate,
                 "delay_rounds": self.params.delay_rounds,
                 "partition_groups": self.params.partition_groups,
                 "poisoning": self.params.poisoning,

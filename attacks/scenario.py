@@ -12,6 +12,7 @@ from attacks.eclipse import EclipseAttack
 from attacks.flooding import PeerFloodingAttack
 from attacks.partitioning import PartitioningAttack
 from attacks.poisoning import PeerPoisoningAttack
+from attacks.sybil import SybilAttack
 from attacks.selective import SelectiveForwardingAttack
 from core.node import Node
 
@@ -37,12 +38,16 @@ class AttackParams:
     unresponsive_p: float = 0.0
     delay_rounds: int = 0 
     eclipse_targets: int = 0 
+    # 5.1.1: koliko Sybil identiteta napadac stvara (resi PoW) po rundi.
+    # 0 = svi odjednom (flash Sybil, PoW resen pre posmatranog perioda).
+    sybil_rate: float = 0.0
     partition_groups: int = 0
     poisoning: bool = True
 
 
 def default_modules() -> tuple:
     return (
+        SybilAttack(),
         ChurnAttack(),
         PeerPoisoningAttack(),
         EclipseAttack(),      
@@ -63,6 +68,8 @@ class Scenario:
     modules: tuple = field(default_factory=default_modules)
     attacker_nodes: Dict[int, Node] = field(default_factory=dict)
     peer_views: Dict[int, List[int]] = field(default_factory=dict)
+    nonces: Dict[int, int] = field(default_factory=dict)
+    pow_difficulty_bits: int = 0
 
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
@@ -75,8 +82,14 @@ class Scenario:
 
     @property
     def ctx(self) -> AttackContext:
-        return AttackContext(self.honest_ids, self.byzantine_ids, self.sybil_ids,
-                             self.params, self.attacker_nodes)
+        if self.params.sybil_rate <= 0 or not self.nonces:
+            zivi = self.sybil_ids
+        else:
+            zivi = {i for i in self.sybil_ids if i in self.nonces}
+        return AttackContext(self.honest_ids, self.byzantine_ids, zivi,
+                             self.params, self.attacker_nodes,
+                             all_sybil_ids=self.sybil_ids, nonces=self.nonces,
+                             pow_difficulty_bits=self.pow_difficulty_bits)
 
     def active_modules(self) -> List:
         ctx = self.ctx

@@ -15,13 +15,19 @@ def module_rng(ctx, identity: int, round_now: int, purpose: str) -> random.Rando
 
 
 class AttackContext:
-    __slots__ = ("honest_ids", "byzantine_ids", "sybil_ids", "params", "attacker_nodes")
+    __slots__ = ("honest_ids", "byzantine_ids", "sybil_ids", "params",
+                 "attacker_nodes", "all_sybil_ids", "nonces", "pow_difficulty_bits")
 
     def __init__(self, honest_ids: Set[int], byzantine_ids: Set[int],
-                 sybil_ids: Set[int], params, attacker_nodes: Dict[int, object] = None):
+                 sybil_ids: Set[int], params, attacker_nodes: Dict[int, object] = None,
+                 all_sybil_ids: Set[int] = None, nonces: Dict[int, int] = None,
+                 pow_difficulty_bits: int = 0):
         self.honest_ids = honest_ids
         self.byzantine_ids = byzantine_ids
         self.sybil_ids = sybil_ids
+        self.all_sybil_ids = all_sybil_ids if all_sybil_ids is not None else sybil_ids
+        self.nonces = nonces if nonces is not None else {}
+        self.pow_difficulty_bits = pow_difficulty_bits
         self.params = params
         self.attacker_nodes = attacker_nodes if attacker_nodes is not None else {}
 

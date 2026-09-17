@@ -119,7 +119,10 @@ def build_world(spec) -> World:
         timeout_rounds=spec.timeout_rounds,
         refresh_period=spec.refresh_period,
     )
-    nonces = solve_nonces(honest | byzantine | sybil, id_params)
+    unapred = honest | byzantine
+    if spec.sybil_rate <= 0:
+        unapred = unapred | sybil
+    nonces = solve_nonces(unapred, id_params)
     for i in honest:
         nodes[i].nonce = nonces[i]
     seed_observations(nodes)
@@ -129,7 +132,7 @@ def build_world(spec) -> World:
     attackers = {}
     for i in sorted(byzantine | sybil):
         att = Node.create(i, att_rng.uniform(spec.value_low, spec.value_high))
-        att.nonce = nonces[i]
+        att.nonce = nonces.get(i)
         attackers[i] = att
 
     if n_byzantine + n_sybil == 0:
@@ -154,11 +157,14 @@ def build_world(spec) -> World:
             selective_p=spec.selective_p,
             unresponsive_p=spec.unresponsive_p,
             eclipse_targets=spec.eclipse_targets,
+            sybil_rate=spec.sybil_rate,
             delay_rounds=spec.delay_rounds,
             partition_groups=spec.partition_groups,
             poisoning=spec.poisoning,
         ))
 
     scenario.attacker_nodes = attackers
+    scenario.nonces = nonces
+    scenario.pow_difficulty_bits = id_params.pow_difficulty_bits
     return World(cfg, nodes, honest, byzantine, sybil, nonces, id_params, scenario, x_star,
                  attackers)
