@@ -78,3 +78,49 @@ def _mean(rows, field):
 def _sel(rows, **conditions):
     return [r for r in rows
             if all(r.get(k) == v for k, v in conditions.items())]
+
+
+def table_criteria(summary, out):
+    from metrics.criteria import CRITERIA, applicable, summarize
+
+    rows = applicable(summary)
+    counts = summarize(summary)
+    lines = [f"## 3.10 Provera kriterijuma prihvatljivosti (beta <= 0.30, "
+             f"{len(rows)} pokretanja)", "",
+             "| kriterijum | mera | prag | prolaz | pad | udeo |",
+             "|---|---|---|---|---|---|"]
+    for c in CRITERIA:
+        p = counts[c.spec]["prolaz"]
+        f = counts[c.spec]["pad"]
+        uk = p + f
+        udeo = f"{p / uk:.1%}" if uk else "-"
+        prag = f"{c.limit:g}" if c.limit >= 1 else f"{c.limit}"
+        lines.append(f"| {c.spec} | {c.label} | <= {prag} | {p} | {f} | {udeo} |")
+    _write(out, lines + [""])
+
+
+def table_criteria_by_overlay(summary, out):    
+    from metrics.criteria import CRITERIA, applicable, evaluate_row
+
+    lines = ["## 3.10 Kriterijumi po strategiji i agregaciji", "",
+             "| strategija | agregacija | " +
+             " | ".join(c.spec for c in CRITERIA) + " | svi |",
+             "|---|---|" + "---|" * (len(CRITERIA) + 1)]
+    for overlay in OVERLAYS:
+        for aggregation in AGGS:
+            rows = [r for r in applicable(summary)
+                    if r.get("overlay") == overlay and r.get("aggregation") == aggregation]
+            if not rows:
+                continue
+            cells = []
+            svi = True
+            for c in CRITERIA:
+                ocene = [evaluate_row(r)[c.spec] for r in rows]
+                prolaz = sum(1 for o in ocene if o is True)
+                uk = sum(1 for o in ocene if o is not None)
+                cells.append(f"{prolaz}/{uk}" if uk else "-")
+                if uk and prolaz < uk:
+                    svi = False
+            lines.append(f"| {overlay} | {aggregation} | " + " | ".join(cells) +
+                         f" | {'DA' if svi else 'ne'} |")
+    _write(out, lines + [""])

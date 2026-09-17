@@ -127,8 +127,17 @@ def main() -> None:
     ablation = load(args.ablation) if os.path.exists(args.ablation) else []
     eclipse = load(eclipse_path) if os.path.exists(eclipse_path) else []
 
+    # tabele poglavlja 7, redom kako se u njemu pojavljuju
+    # D1: prvo preslikavanje nominalne u realizovanu betu, da se ostale tabele
+    # sa "b=..." zaglavljima citaju sa ispravnim apscisama
+    # F / 3.10: provera kriterijuma ide prva — daje odgovor na pitanje
+    # da li sistem zadovoljava zahteve, pre nego sto slede detalji
+    table_criteria(summary, args.tables)
+    table_criteria_by_overlay(summary, args.tables)
     table_realized_beta(summary, args.tables)
     table_error_by_beta(summary, args.tables)
+    # E2: bazna linija i greska umanjena za nju — bez toga se u 7.1
+    # sistemska pristrasnost median/trimmed_mean mesa sa efektom napada
     table_benign_baseline(summary, args.tables)
     table_error_above_baseline(summary, args.tables)
     table_profile_error(ablation, args.tables)
