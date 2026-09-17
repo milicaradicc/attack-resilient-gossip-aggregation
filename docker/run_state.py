@@ -124,6 +124,8 @@ class ControllerState:
     def maybe_build_offers(self, r):
         if r in self.offers_done or len(self.peers_in.get(r, {})) < self.n:
             return
+        self.scenario.peer_views = {i: list(self.peers_in[r][i])
+                                    for i in range(self.n)}
         for i in range(self.n):
             view = _OfferView(i, self.peers_in[r][i])
             self.offers[(r, i)] = [[c, self.nonces.get(c)]

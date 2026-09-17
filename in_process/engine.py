@@ -25,6 +25,8 @@ class Engine:
         reasons = round_ops.empty_reasons()
         for node in self.nodes.values():
             self.sampling.refresh_peers(node, round_now, self.rng)
+        self.scenario.peer_views = {hid: list(n.peers)
+                                    for hid, n in self.nodes.items()}
         for node in self.nodes.values():
             round_ops.send_peer_request(node, round_now, transport=transport)
         for node in self.nodes.values():
@@ -41,8 +43,6 @@ class Engine:
         return offered, sum(reasons.values()), reasons
 
     def _emit(self, round_now):
-        # H9: ista logika koju koristi i distribuirana putanja — drzi se na
-        # jednom mestu (core/round_ops), da se dve putanje ne raziđu
         return round_ops.emitted_values(self.nodes, self.scenario, round_now,
                                         trace=self.trace)
 

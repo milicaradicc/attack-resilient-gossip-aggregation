@@ -62,6 +62,7 @@ class Scenario:
     params: AttackParams = field(default_factory=AttackParams)
     modules: tuple = field(default_factory=default_modules)
     attacker_nodes: Dict[int, Node] = field(default_factory=dict)
+    peer_views: Dict[int, List[int]] = field(default_factory=dict)
 
     @classmethod
     def benign(cls, honest_ids: Set[int]) -> "Scenario":
@@ -155,10 +156,17 @@ class Scenario:
         count = self.params.discovery_offers
         if count <= 0:
             return []
-        pool = [h for h in sorted(self.honest_ids)
-                if h != node.node_id and h not in node.peers]
-        rng.shuffle(pool)
-        return pool[:count]
+        poznati = set(node.peers) | {node.node_id}
+        pool = set()
+        for peer in node.peers:
+            for kandidat in self.peer_views.get(peer, ()):
+                if kandidat not in poznati:
+                    pool.add(kandidat)
+        if not pool:
+            return []
+        redosled = sorted(pool)
+        rng.shuffle(redosled)
+        return redosled[:count]
 
     def before_round(self, nodes: Dict[int, Node], round_now: int, trace=None) -> None:
         if not self.active(round_now):
