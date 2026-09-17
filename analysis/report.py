@@ -5,7 +5,8 @@ import os
 
 from analysis.loader import load
 
-from analysis.common import table_realized_beta
+from analysis.common import (table_criteria, table_criteria_by_overlay,
+                             table_realized_beta)
 
 # 7.1
 from analysis.error_by_strategy import (

@@ -47,12 +47,6 @@ def table_overhead(summary, beta, out):
     _write(out, lines + [""])
 
 
-DOPUNSKE_MERE = [("final_err_rel", "relativna greska"),
-                 ("final_sybil_penetration", "Sybil penetracija"),
-                 ("recovery_time", "vreme oporavka"),
-                 ("control_overhead", "kontrolni overhead"),
-                 ("rejected_ratio", "udeo odbijenih")]
-
 def table_overhead_vs_resilience(summary_rows, beta, out):
     # 7.8: odnos izmedju placenog overhead-a i postignute otpornosti.
     # Referentna strategija sluzi kao osnova: koliko dodatnih kontrolnih poruka
@@ -74,7 +68,7 @@ def table_overhead_vs_resilience(summary_rows, beta, out):
         error = _mean(rows, "final_err_rel")
         pen = _mean(rows, "final_sybil_penetration")
         dodatni = f"{control - o_control:+.2f} ({(control / o_control - 1) * 100:+.0f}%)"
-        puta_greska = "-" if error <= 0 else f"{o_greska / greska:.0f}x"
+        puta_greska = "-" if error <= 0 else f"{o_greska / error:.0f}x"
         puta_pen = "-" if pen <= 0 else f"{o_pen / pen:.0f}x"
         lines.append(f"| {overlay} | {dodatni} | {puta_greska} | {puta_pen} |")
     _write(out, lines + [""])
