@@ -15,7 +15,7 @@ RNG = random.Random(0)
 
 
 def _scenario(unresponsive_p):
-    return Scenario({0, 1}, {2}, set(), AttackParams(activate_round=1, unresponsive_p=unresponsive_p))
+    return Scenario({0, 1}, set(), {2}, AttackParams(activate_round=1, unresponsive_p=unresponsive_p))
 
 
 def test_honest_always_responds():

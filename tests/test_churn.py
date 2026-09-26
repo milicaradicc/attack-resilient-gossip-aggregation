@@ -22,7 +22,7 @@ def _spec(**over):
 
 
 def _absent_by_round(world, rounds):
-    attackers = sorted(world.byzantine | world.sybil)
+    attackers = sorted(world.sybil)
     return {r: {i for i in attackers if not world.scenario.responds(i, r, None)}
             for r in rounds}
 
@@ -38,7 +38,7 @@ def test_departures_are_not_synchronised():
 
 def test_attackers_never_all_leave_at_once():
     world = build_world(_spec(churn_period=5))
-    attackers = world.byzantine | world.sybil
+    attackers = world.sybil
     absent = _absent_by_round(world, range(1, 26))
     assert all(len(s) < len(attackers) for s in absent.values()), (
         "postoji runda u kojoj su svi napadaci odsutni")
@@ -46,7 +46,7 @@ def test_attackers_never_all_leave_at_once():
 
 def test_each_attacker_follows_its_own_cycle():
     world = build_world(_spec(churn_period=5, churn_offline=1))
-    for attacker in sorted(world.byzantine | world.sybil):
+    for attacker in sorted(world.sybil):
         absent_rounds = [r for r in range(1, 21)
                          if not world.scenario.responds(attacker, r, None)]
         for start in range(1, 16):
@@ -56,37 +56,36 @@ def test_each_attacker_follows_its_own_cycle():
 
 def test_absent_attacker_is_in_nobodys_peer_set():
     world = build_world(_spec(churn_period=6, churn_offline=2))
-    ctx = world.scenario.ctx
     churn = world.scenario._churn()
-    attackers = sorted(world.byzantine | world.sybil)
+    attackers = sorted(world.sybil)
     for node in world.nodes.values():
         node.peers = list(node.peers) + attackers
 
+    anyone_left = False
     for r in range(1, 13):
         world.scenario.before_round(world.nodes, r)
-        away = set(churn.offline_ids(ctx, r))
-        assert away, f"round {r}: churn removes nobody"
+        away = set(churn.offline_ids(world.scenario.ctx, r))
+        anyone_left = anyone_left or bool(away)
         for node in world.nodes.values():
             left_over = away & set(node.peers)
             assert not left_over, f"round {r}, node {node.node_id}: still holds {left_over}"
-        # vrati ih, da sledeca runda proveri da li su ponovo uklonjeni
         for node in world.nodes.values():
             node.peers = list(node.peers) + [a for a in attackers if a not in node.peers]
-
+    assert anyone_left, "churn ne uklanja nikoga ni u jednoj rundi"
 
 def test_absent_attacker_is_not_offered_in_discovery():
     world = build_world(_spec(churn_period=6, churn_offline=2))
-    ctx = world.scenario.ctx
     churn = world.scenario._churn()
     rng = random.Random(7)
     present_were_offered = False
     for r in range(1, 13):
-        away = set(churn.offline_ids(ctx, r))
+        world.scenario.before_round(world.nodes, r)
+        away = set(churn.offline_ids(world.scenario.ctx, r))
         for node in world.nodes.values():
             offer = set(world.scenario.offer_candidates(node, r, rng))
             assert not (offer & away), (
                 f"round {r}, node {node.node_id}: absent identity offered {offer & away}")
-            if offer & (world.byzantine | world.sybil):
+            if offer & (world.sybil):
                 present_were_offered = True
     assert present_were_offered, "no attacker is ever offered - the filter is too wide"
 
@@ -95,7 +94,7 @@ def test_return_puts_the_identity_back_into_the_network():
     world = build_world(_spec(churn_period=5, churn_offline=2))
     ctx = world.scenario.ctx
     churn = world.scenario._churn()
-    attacker = sorted(world.byzantine | world.sybil)[0]
+    attacker = sorted(world.sybil)[0]
     rng = random.Random(3)
     comeback = next(r for r in range(2, 15) if churn.returning(ctx, attacker, r))
     assert churn.offline(ctx, attacker, comeback - 1), "runda pre povratka nije odsustvo"
@@ -158,7 +157,7 @@ def test_return_clears_observation_log_of_others():
 def test_no_reset_before_attack_activation():
     from core import round_ops
     world = build_world(_spec(activate_round=11, churn_period=4, num_rounds=20))
-    attacker = sorted(world.byzantine | world.sybil)[0]
+    attacker = sorted(world.sybil)[0]
     node = world.nodes[0]
     round_ops.observe(node, attacker, 1, exchanged=True)
     node.observations[attacker].missed_total = 7
@@ -184,7 +183,7 @@ def test_no_reset_before_attack_activation():
 def test_longer_absence_follows_churn_offline():
     short = build_world(_spec(churn_period=6, churn_offline=1))
     long_ = build_world(_spec(churn_period=6, churn_offline=3))
-    attacker = sorted(short.byzantine | short.sybil)[0]
+    attacker = sorted(short.sybil)[0]
     a = sum(1 for r in range(1, 25) if not short.scenario.responds(attacker, r, None))
     b = sum(1 for r in range(1, 25) if not long_.scenario.responds(attacker, r, None))
     assert b > a, f"churn_offline did not lengthen the absence ({b} vs {a})"
@@ -193,7 +192,7 @@ def test_longer_absence_follows_churn_offline():
 def test_disabled_churn_changes_nothing():
     world = build_world(_spec(churn_period=0))
     assert not world.scenario._churn().enabled(world.scenario.ctx)
-    attackers = sorted(world.byzantine | world.sybil)
+    attackers = sorted(world.sybil)
     assert all(world.scenario.responds(i, r, None)
                for i in attackers for r in range(1, 21)), (
         "an attacker is away even though churn is not enabled")

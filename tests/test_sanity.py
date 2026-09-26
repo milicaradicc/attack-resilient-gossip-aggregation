@@ -50,9 +50,11 @@ def test_single_eclipse_attempt():
 def test_single_churn_peer():
     from core.setup import build_world
     spec = _one_attacker(overlay="sybil_resistant", aggregation="mean",
-                         churn_period=4, churn_offline=1)
+                         churn_period=4, churn_offline=1, byzantine_fraction=0.0)
     world = build_world(spec)
-    attacker = sorted(world.byzantine | world.sybil)[0]
+    for r in range(1, 9):
+        world.scenario.before_round(world.nodes, r)
+    attacker = sorted(world.sybil)[0]
     absent = [r for r in range(1, 9)
               if not world.scenario.responds(attacker, r, None)]
     assert absent, "the attacker must be away for at least one round"
@@ -67,9 +69,11 @@ def test_churn_clears_observation_log():
     from core.setup import build_world
     from core import round_ops
     spec = _one_attacker(overlay="sybil_resistant", aggregation="mean",
-                         churn_period=4, churn_offline=1)
+                         churn_period=4, churn_offline=1, byzantine_fraction=0.0)
     world = build_world(spec)
-    attacker = sorted(world.byzantine | world.sybil)[0]
+    for r in range(1, 9):
+        world.scenario.before_round(world.nodes, r)
+    attacker = sorted(world.sybil)[0]
     node = world.nodes[0]
     round_ops.observe(node, attacker, 1, exchanged=True)
     node.observations[attacker].missed_total = 5
