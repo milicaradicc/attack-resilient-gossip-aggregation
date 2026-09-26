@@ -162,7 +162,8 @@ def test_admission_decision_respects_bucket_limit():
     from sampling import get_strategy
     spec = spec_from(n_honest=20, beta=0.3, overlay="eclipse_resistant",
                      aggregation="trimmed_mean", seed=1, num_rounds=30,
-                     activate_round=1, pow_difficulty_bits=8)
+                     activate_round=1, pow_difficulty_bits=8,
+                     sybil_rate=0.0)
     world = build_world(spec)
     strategy = get_strategy("eclipse_resistant", spec.peer_set_size, world.id_params)
     limit = world.id_params.max_per_bucket

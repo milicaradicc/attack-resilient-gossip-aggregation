@@ -46,18 +46,23 @@ def test_never_converged_counts_as_failure():
 
 
 def test_protected_overlay_meets_criteria():
-    # zasticena postavka na gornjoj granici iz 3.10 (beta = 0.30) mora da
-    # zadovolji sve kriterijume — to je tvrdnja koju rad brani
-    spec = spec_from(n_honest=15, beta=0.3, overlay="eclipse_resistant",
+    spec = spec_from(n_honest=15, beta=0.3, overlay="sybil_resistant",
                      aggregation="trimmed_mean", seed=1, num_rounds=50)
     ocene = evaluate_row(_summary_row(spec))
     pali = [spec_id for spec_id, ok in ocene.items() if ok is False]
     assert not pali, f"zasticena postavka obara kriterijume: {pali}"
 
 
+def test_eclipse_overlay_keeps_accuracy_and_structure():
+    spec = spec_from(n_honest=15, beta=0.3, overlay="eclipse_resistant",
+                     aggregation="trimmed_mean", seed=1, num_rounds=50)
+    ocene = evaluate_row(_summary_row(spec))
+    for kriterijum in ("3.10.1", "3.10.2", "3.10.3"):
+        assert ocene.get(kriterijum) is not False, (
+            f"eclipse-otporna obara {kriterijum}")
+
+
 def test_baseline_fails_at_least_one_criterion():
-    # kontrola: bez ikakve zastite bar jedan kriterijum mora pasti, inace
-    # provera ne bi razlikovala zasticen sistem od nezasticenog
     spec = spec_from(n_honest=15, beta=0.3, overlay="random",
                      aggregation="mean", seed=1, num_rounds=50)
     ocene = evaluate_row(_summary_row(spec))

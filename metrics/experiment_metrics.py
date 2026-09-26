@@ -81,7 +81,6 @@ class ExperimentMetrics:
     node_rows: List[NodeMetrics] = field(default_factory=list)
 
     def _node_error(self, estimate: float) -> float:
-        # relativno odstupanje jednog cvora od stvarne srednje vrednosti honest cvorova
         return (abs(estimate - self.x_star) / abs(self.x_star)
                 if self.x_star else abs(estimate))
 
@@ -89,8 +88,6 @@ class ExperimentMetrics:
         c = counters or RoundCounters()
         estimates = [n.estimate for n in nodes.values()]
         avg = mean(estimates)
-        # 6.3.1: relativna greska racuna se PO CVORU pa se usrednjava preko svih
-        # honest cvorova: E = (1/|V_H|) * suma |x_i - x*| / |x*|
         err = mean(self._node_error(e) for e in estimates)
         spread = max(estimates) - min(estimates)
         pen = mean(self._sybil_share(n, scenario) for n in nodes.values())
@@ -211,11 +208,9 @@ class ExperimentMetrics:
         return breakdown
 
     def to_csv_rows(self):
-        return [[r.round, r.err_rel, r.spread, r.sybil_penetration, r.eclipse_rate,
-                 r.peer_diversity, r.bucket_occupancy, r.avg_estimate,
-                 r.control_msgs, r.data_msgs, r.offered, r.rejected,
-                 r.rej_invalid_pow, r.rej_too_young, r.rej_low_score, r.rej_bucket_full, r.timeouts]
-                for r in self.rows]
+        # red se gradi direktno iz FIELDS, pa zaglavlje i vrednosti ne mogu da
+        # se raziđu kada se doda nova metrika
+        return [[getattr(r, f) for f in FIELDS] for r in self.rows]
 
     def write_csv(self, path):
         with open(path, "w", newline="") as f:

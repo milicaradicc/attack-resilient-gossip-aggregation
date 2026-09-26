@@ -116,7 +116,9 @@ def emitted_values(nodes: Dict[int, object], scenario, round_now: int,
     out = {}
     for hid, node in nodes.items():
         out[hid] = scenario.broadcast_value(hid, node.estimate, round_now)
-    for m in sorted(scenario.malicious_ids): # fixed order, for determinism
+    # samo identiteti koji postoje u ovoj rundi; Sybil koji jos nije stvoren
+    # (sybil_rate > 0) ne emituje nista
+    for m in sorted(scenario.ctx.malicious_ids): # fixed order, for determinism
         value = scenario.broadcast_value(m, 0.0, round_now)
         if value is NO_MESSAGE:
             continue

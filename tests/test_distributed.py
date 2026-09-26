@@ -186,3 +186,13 @@ if __name__ == "__main__":
     test_unresponsive_attacker_is_silent_in_both_paths()
     test_reported_peer_set_is_the_post_churn_one()
     print("OK - the distributed system (benign + attack) reproduces in-process")
+
+def test_distributed_fanout_matches_inprocess():
+    from core.config import spec_from
+    for fanout in (1, 3):
+        spec = spec_from(n_honest=10, beta=0.3, overlay="sybil_resistant",
+                         aggregation="trimmed_mean", seed=1, num_rounds=20,
+                         pow_difficulty_bits=8, gossip_fanout=fanout)
+        d, i = _distributed(spec), run_single(spec).rows[-1]
+        assert abs(d.err_rel - i.err_rel) < 1e-9, f"fanout={fanout}"
+        assert abs(d.sybil_penetration - i.sybil_penetration) < 1e-9, f"fanout={fanout}"

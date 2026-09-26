@@ -17,7 +17,7 @@ class DelayAttack(BaseAttack):
     def broadcast_value(self, ctx: AttackContext, identity: int, value: float,
                         round_now: int) -> Optional[float]:
         p = ctx.params
-        if p.delay_rounds <= 0 or identity not in ctx.malicious_ids:
+        if p.delay_rounds <= 0 or identity not in ctx.sybil_ids:
             return None
 
         current = ctx.attacker_view(identity)

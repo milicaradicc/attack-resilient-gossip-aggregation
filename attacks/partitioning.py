@@ -19,7 +19,7 @@ class PartitioningAttack(BaseAttack):
     def sends_value_to(self, ctx: AttackContext, identity: int, target: int,
                        round_now: int) -> Optional[bool]:
         p = ctx.params
-        if p.partition_groups <= 1 or identity not in ctx.malicious_ids:
+        if p.partition_groups <= 1 or identity not in ctx.sybil_ids:
             return None
         if target is None:
             return None

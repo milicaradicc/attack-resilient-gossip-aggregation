@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from attacks.base import NO_MESSAGE
-from core import messages, round_ops
+from core import messages
+from core import round_ops
+from core.rng import make_rng
 from core.transport import Transport
 from metrics.experiment_metrics import RoundCounters
 
 
 class Engine:
     def __init__(self, nodes, aggregation, sampling, scenario, num_rounds, metrics, rng,
-                 nonces, timeout_rounds: int = 0, trace=None):
+                 nonces, timeout_rounds: int = 0, trace=None, seed=None):
         self.nodes = nodes
         self.aggregation = aggregation
         self.sampling = sampling
@@ -19,6 +21,10 @@ class Engine:
         self.nonces = nonces
         self.timeout_rounds = timeout_rounds
         self.trace = trace # 5.1.8: opcioni zapis dogadjaja
+        # 4.10: izbor suseda za razmenu izvodi se iz seed-a, cvora i runde, pa
+        # ne zavisi od redosleda obrade. Bez toga distribuirana putanja, u kojoj
+        # svaki cvor ima sopstveni proces, ne moze da reprodukuje isti izbor.
+        self.seed = seed
 
     def _discover(self, round_now, transport=None):
         offered = 0
@@ -84,7 +90,9 @@ class Engine:
             data_msgs = 0
             timeouts = 0
             for hid, node in self.nodes.items():
-                peers = self.sampling.select_gossip_peers(node, self.rng) # peer-ovi za ovu razmenu
+                gossip_rng = (make_rng(self.seed, "gossip", hid, r)
+                              if self.seed is not None else self.rng)
+                peers = self.sampling.select_gossip_peers(node, gossip_rng) # peer-ovi za ovu razmenu
                 responders, t = self._heartbeat(node, peers, r, transport=transport)
                 timeouts += t
                 round_ops.deliver(node, responders, emitted, r, transport=transport,

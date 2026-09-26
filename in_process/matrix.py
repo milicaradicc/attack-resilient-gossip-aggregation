@@ -30,7 +30,7 @@ def run_single(spec: RunSpec, trace: EventTrace = None) -> ExperimentMetrics:
     rng = make_rng(spec.seed, "matrix", spec.overlay, spec.aggregation)
 
     engine = Engine(world.nodes, aggregation, sampling, world.scenario, spec.num_rounds,
-                    metrics, rng, world.nonces, timeout_rounds=spec.timeout_rounds, trace=trace)
+                    metrics, rng, world.nonces, timeout_rounds=spec.timeout_rounds, seed=spec.seed, trace=trace)
     engine.run()
     return metrics
 

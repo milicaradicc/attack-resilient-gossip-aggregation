@@ -17,6 +17,7 @@ from core.node import Node
 from docker import value_server
 from identity.observation import Observation
 from identity.params import IdentityParams
+from core.rng import make_rng
 from sampling import get_strategy
 
 
@@ -90,6 +91,8 @@ def _build(cfg):
     nonces = {int(k): v for k, v in cfg["nonces"].items()}
     scenario = Scenario(set(cfg["honest"]), set(cfg["byzantine"]), set(cfg["sybil"]),
                         AttackParams(**cfg["attack"]))
+    scenario.nonces = nonces
+    scenario.pow_difficulty_bits = params.pow_difficulty_bits
     return params, nonces, scenario
 
 
@@ -131,8 +134,13 @@ def run_honest(base, node_id, cfg, job, store, addresses):
                 fetched[p] = reply["value"]
             return True
 
+        # isti izbor suseda kao u in-process putanji: izveden iz seed-a, cvora
+        # i runde, pa se dve putanje ne mogu razici ni kada fanout nije ceo
+        # peer set
+        gossip_peers = strategy.select_gossip_peers(
+            node, make_rng(cfg.get("seed", 0), "gossip", node_id, r))
         responders, timeouts = round_ops.heartbeat(
-            node, list(node.peers), r, timeout_rounds, peer_responds,
+            node, gossip_peers, r, timeout_rounds, peer_responds,
             trace=trace, transport=transport)
 
         values = {p: v for p, v in fetched.items() if p in responders}
@@ -172,6 +180,11 @@ def run_malicious(base, node_id, cfg, job, store, addresses):
     participants = cfg["participants"]
 
     for r in range(1, cfg["num_rounds"] + 1):
+        scenario.before_round({}, r)
+        if node_id not in scenario.ctx.malicious_ids:
+            store.publish(job, r, None, responds=lambda who: False,
+                          sends_to=lambda who: False)
+            continue
         heard = []
         for h in range(cfg["n_honest"]):
             reply = _fetch_value(addresses, h, job, r, participants, node_id)

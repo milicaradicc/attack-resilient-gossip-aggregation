@@ -14,7 +14,7 @@ class ChurnAttack(BaseAttack):
 
     def cycle(self, ctx: AttackContext, identity: int) -> tuple:
         p = ctx.params
-        if identity not in ctx.malicious_ids or p.churn_period <= 0:
+        if identity not in ctx.sybil_ids or p.churn_period <= 0:
             return 0, 0
         return p.churn_period, max(1, min(p.churn_offline, p.churn_period - 1))
 
@@ -37,22 +37,22 @@ class ChurnAttack(BaseAttack):
         return ((round_now + self.phase(ctx, identity)) % period) == absent
 
     def returning_ids(self, ctx: AttackContext, round_now: int) -> List[int]:
-        return [i for i in sorted(ctx.malicious_ids)
+        return [i for i in sorted(ctx.sybil_ids)
                 if self.returning(ctx, i, round_now)]
 
     def offline_ids(self, ctx: AttackContext, round_now: int) -> List[int]:
-        return [i for i in sorted(ctx.malicious_ids)
+        return [i for i in sorted(ctx.sybil_ids)
                 if self.offline(ctx, i, round_now)]
 
     def responds(self, ctx: AttackContext, identity: int, round_now: int,
                  target: Optional[int] = None) -> Optional[bool]:
-        if identity not in ctx.malicious_ids:
+        if identity not in ctx.sybil_ids:
             return None
         return False if self.offline(ctx, identity, round_now) else None
 
     def broadcast_value(self, ctx: AttackContext, identity: int, value: float,
                         round_now: int) -> Optional[float]:
-        if identity not in ctx.malicious_ids:
+        if identity not in ctx.sybil_ids:
             return None
         return NO_MESSAGE if self.offline(ctx, identity, round_now) else None
 

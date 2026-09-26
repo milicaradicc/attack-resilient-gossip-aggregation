@@ -3,7 +3,7 @@
   "beta": [0.3],
   "overlay": ["random", "sybil_resistant", "eclipse_resistant"],
   "aggregation": ["trimmed_mean"],
+  "partition_groups": [0, 2, 3, 4],
   "seeds": [1, 2, 3, 4, 5],
-  "selective_p": [1.0, 0.75, 0.5, 0.25],
-  "activate_round": 1
+  "activate_round": 11
 }

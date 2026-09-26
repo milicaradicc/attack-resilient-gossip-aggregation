@@ -10,7 +10,6 @@ class SybilAttack(BaseAttack):
     name = "sybil"
 
     def __init__(self):
-        # {identitet: runda u kojoj je resen njegov PoW}
         self.created: Dict[int, int] = {}
 
     def enabled(self, ctx: AttackContext) -> bool:
@@ -18,13 +17,13 @@ class SybilAttack(BaseAttack):
 
     def _due(self, ctx: AttackContext, round_now: int) -> List[int]:
         rate = ctx.params.sybil_rate
-        redosled = sorted(ctx.all_sybil_ids)
+        ordered_ids = sorted(ctx.all_sybil_ids)
         if rate <= 0:
-            return redosled
-        proteklo = round_now - ctx.params.activate_round
-        if proteklo < 0:
+            return ordered_ids
+        elapsed = round_now - ctx.params.activate_round
+        if elapsed < 0:
             return []
-        return redosled[:int(proteklo * rate) + 1]
+        return ordered_ids[:int(elapsed * rate) + 1]
 
     def before_round(self, ctx: AttackContext, nodes, round_now: int, trace=None) -> None:
         for identity in self._due(ctx, round_now):

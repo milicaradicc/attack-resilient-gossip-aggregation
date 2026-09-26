@@ -30,8 +30,6 @@ def generate(args):
                   "    build:", "      context: ..", "      dockerfile: docker/Dockerfile",
                   "    environment:", "      ROLE: node", f"      NODE_ID: \"{i}\"",
                   f"      CONTROLLER_URL: http://controller:{args.port}",
-                  # 5.1.5: svaki cvor podize sopstveni server za vrednosti, pa
-                  # susedi vrednosti uzimaju direktno od njega
                   f"      NODE_PORT: \"{args.node_port}\"",
                   "    depends_on:", "      - controller"]
     return "\n".join(lines) + "\n", total, len(specs)

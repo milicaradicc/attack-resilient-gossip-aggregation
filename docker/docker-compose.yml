@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       ROLE: "controller"
-      MATRIX_CONFIG: "configs/ablation.json"
-      MATRIX_OUT: "results/docker/ablation.csv"
+      MATRIX_CONFIG: "configs/churn.json"
+      MATRIX_OUT: "results/docker/churn.csv"
       PORT: "8000"
     ports:
       - "8000:8000"
