@@ -5,8 +5,8 @@ services:
       dockerfile: docker/Dockerfile
     environment:
       ROLE: "controller"
-      MATRIX_CONFIG: "configs/churn.json"
-      MATRIX_OUT: "results/docker/churn.csv"
+      MATRIX_CONFIG: "configs/admission.json"
+      MATRIX_OUT: "results/docker/admission.csv"
       PORT: "8000"
     ports:
       - "8000:8000"
@@ -217,6 +217,28 @@ services:
     environment:
       ROLE: node
       NODE_ID: "18"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node19:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "19"
+      CONTROLLER_URL: http://controller:8000
+      NODE_PORT: "8100"
+    depends_on:
+      - controller
+  node20:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    environment:
+      ROLE: node
+      NODE_ID: "20"
       CONTROLLER_URL: http://controller:8000
       NODE_PORT: "8100"
     depends_on:
